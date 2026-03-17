@@ -1,0 +1,10 @@
+# ignore everything
+*
+
+# allow gitignore itself
+!.gitignore
+
+# allow your scripts
+!gen_job.pbs
+!gen_minimap2.sh
+!gen_proc.sh
