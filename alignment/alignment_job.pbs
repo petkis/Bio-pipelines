@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N winnowmap_test
+#PBS -N alignment_pipeline
 #PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
 #PBS -l walltime=48:00:00
 #PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/latest.out
