@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N winnowmap_test
-#PBS -l select=1:ncpus=18:mem=280gb:scratch_local=220gb
+#PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
 #PBS -l walltime=48:00:00
 #PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/latest.out
 #PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/latest.err
@@ -17,9 +17,9 @@ CHROMARM="${ARM:-p}"
 module purge
 module add samtools
 
-TOOL="${TOOL:-minimap2}"
-CHROM="${CHROM:-chr13_PATERNAL}"
-LENGTHS=(40000 30000 20000 10000)
+TOOL="${TOOL:-winnowmap}"
+CHROM="${CHROM:-chr21_PATERNAL}"
+LENGTHS=(30000 20000)
 
 TOOL="${TOOL,,}"
 
