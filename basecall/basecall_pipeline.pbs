@@ -31,7 +31,7 @@ MODEL_TAG=$(echo $MODEL | tr '@' '_' | tr '.' '_')
 
 INPUT_POD5="/storage/brno12-cerit/home/xpetkov/basecall/final_pod5/telomeric_subset.pod5"
 FAST5_SOURCE="/storage/brno12-cerit/home/xpetkov/basecall/fast5_telomeric_subset"
-OUT_BASE="/storage/brno12-cerit/home/xpetkov/basecall/telo_eval_TEST"
+OUT_BASE=/storage/brno12-cerit/home/xpetkov/basecall/results"
 
 OUT_DIR="${OUT_BASE}/${BASECALLER}_v${VERSION}_${MODEL_TAG}"
 mkdir -p "$OUT_DIR"
