@@ -1,10 +1,14 @@
 # ignore everything
 *
 
-# allow gitignore itself
+# allow gitignore itself and readme
 !.gitignore
-
-# allow your scripts
-!basecall/*
-!alignment/*
 !README.md
+
+# allow directories
+!alignment/
+!basecall/
+
+# allow all contents inside them
+!alignment/**
+!basecall/**

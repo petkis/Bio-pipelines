@@ -1,0 +1,133 @@
+#!/bin/bash
+#PBS -N winnowmap_test
+#PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
+#PBS -l walltime=48:00:00
+#PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/latest.out
+#PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/latest.err
+
+set -euo pipefail
+WORKDIR="/storage/brno2/home/xpetkov/genomes"
+DESTDIR="/storage/brno12-cerit/home/xpetkov"
+LOGSDIR="/storage/brno2/home/xpetkov/genomes/gen_logs"
+
+mkdir -p "$LOGSDIR"
+
+CHROMARM="${ARM:-p}"
+
+module purge
+module add samtools
+
+TOOL="${TOOL:-winnowmap}"
+CHROM="${CHROM:-chr21_PATERNAL}"
+LENGTHS=(30000 20000)
+
+TOOL="${TOOL,,}"
+
+case "$TOOL" in
+    minimap2|winnowmap) ;;
+    *)
+        echo "Error: TOOL must be 'minimap2' or 'winnowmap'" >&2
+        exit 1
+        ;;
+esac
+
+exec >"$LOGSDIR/${CHROM}_${PBS_JOBID}.out"
+exec 2>"$LOGSDIR/${CHROM}_${PBS_JOBID}.err"
+
+cd "$PBS_O_WORKDIR"
+
+echo "Copying input data from $WORKDIR ..."
+
+cp "$WORKDIR/genome_masked.fa" "$SCRATCHDIR"/
+cp "$WORKDIR/genome_no_telomeres.fa" "$SCRATCHDIR"/
+cp "$WORKDIR/genome_telomeres.fa" "$SCRATCHDIR"/
+
+echo "Copy of genomes finished"
+
+cp "$WORKDIR/gen_minimap2.sh" "$SCRATCHDIR"/
+cp "$WORKDIR/gen_proc.sh" "$SCRATCHDIR"/
+
+echo "Copy of scripts finished"
+
+echo "Copy of repetitive_k15*"
+
+cp "$WORKDIR/meryl_clean/repetitive_k15_telo.txt"   "$SCRATCHDIR"/
+cp "$WORKDIR/meryl_clean/repetitive_k15_notelo.txt" "$SCRATCHDIR"/
+cp "$WORKDIR/meryl_clean/repetitive_k15_masked.txt" "$SCRATCHDIR"/
+
+echo "Copy DONE"
+
+cd "$SCRATCHDIR"
+chmod +x gen_*.sh
+
+mkdir -p chroms
+
+samtools faidx genome_telomeres.fa
+CHR_LENGTH=$(awk -v c="$CHROM" '$1==c{print $2}' genome_telomeres.fa.fai)
+
+if (( CHR_LENGTH < 250000 )); then
+  echo "ERROR: $CHROM length $CHR_LENGTH < 250000" >&2
+  exit 1
+fi
+
+if [ "$CHROMARM" = "p" ]; then
+    START=1
+    END=250000
+elif [ "$CHROMARM" = "q" ]; then
+    START=$((CHR_LENGTH - 250000 + 1))
+    END=$CHR_LENGTH
+else
+    echo "CHROMARM must be p or q"
+    exit 1
+fi
+REGION="${CHROM}:${START}-${END}"
+echo "$REGION"
+
+samtools faidx genome_masked.fa       "$REGION" > "chroms/${CHROM}_Masked.fa"
+samtools faidx genome_no_telomeres.fa "$REGION" > "chroms/${CHROM}_NoTelo.fa"
+samtools faidx genome_telomeres.fa    "$REGION" > "chroms/${CHROM}_Telo.fa"
+
+echo "CHR_LENGTH = $CHR_LENGTH"
+
+export PATH="/storage/brno2/home/xpetkov/sw_wgsim/bin:$PATH"
+
+echo "=== START MINIMAP2 SIMULATIONS ==="
+
+module purge
+module add mambaforge
+if [[ "$TOOL" == "winnowmap" ]]; then
+    mamba activate /software/mambaforge/22.9.0-3/envs/winnowmap
+else
+    mamba activate /cvmfs/software.metacentrum.cz/conda/envs/hybracter-0.11.2
+fi
+
+for LEN in "${LENGTHS[@]}"; do
+    echo "Running LEN = $LEN"
+
+    ./gen_minimap2.sh "$CHROM" "$LEN" Telo "$TOOL"
+    ./gen_minimap2.sh "$CHROM" "$LEN" NoTelo "$TOOL"
+    ./gen_minimap2.sh "$CHROM" "$LEN" Masked "$TOOL"
+done
+
+echo "=== FINISHED MINIMAP2 ==="
+
+module add samtools
+module add metabase/1
+
+echo "=== START PROCESSING ==="
+
+./gen_proc.sh "$CHROM" "$CHR_LENGTH" Telo
+./gen_proc.sh "$CHROM" "$CHR_LENGTH" NoTelo
+./gen_proc.sh "$CHROM" "$CHR_LENGTH" Masked
+
+echo "=== FINISHED PROCESSING ==="
+
+echo "Copying full processing results → $DESTDIR/PROC_RESULTS_${CHROM}"
+
+mkdir -p "$DESTDIR/${TOOL}_${CHROMARM}_PROC_RESULTS_${CHROM}/"
+rsync -av --exclude='*.sam' "$SCRATCHDIR/"*"_post_alignments"/ \
+      "$DESTDIR/${TOOL}_${CHROMARM}_PROC_RESULTS_${CHROM}/" || true
+
+echo "=== ALL OUTPUT COPIED ==="
+
+clean_scratch
