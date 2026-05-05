@@ -5,16 +5,6 @@
 !.gitignore
 
 # allow your scripts
-!sub_job.sh
-!gen_job.pbs
-!gen_minimap2.sh
-!gen_proc.sh
-!basecall/
-!basecall/base_pipe.pbs
-!chroms_list.txt
-!plot_results.R
-!basecall/compare_basecall.pbs
-!basecall/telo_compare.R
-!basecall/telomere_graphs.R
-!basecall/telo_histograms.R
+!basecall/*
+!alignment/*
 
