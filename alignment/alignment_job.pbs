@@ -58,7 +58,7 @@ cp "$WORKDIR/meryl_clean/repetitive_k15_masked.txt" "$SCRATCHDIR"/
 echo "Copy DONE"
 
 cd "$SCRATCHDIR"
-chmod +x gen_*.sh
+chmod +x alignment_*.sh
 
 mkdir -p chroms
 
@@ -104,9 +104,9 @@ fi
 for LEN in "${LENGTHS[@]}"; do
     echo "Running LEN = $LEN"
 
-    ./gen_minimap2.sh "$CHROM" "$LEN" Telo "$TOOL"
-    ./gen_minimap2.sh "$CHROM" "$LEN" NoTelo "$TOOL"
-    ./gen_minimap2.sh "$CHROM" "$LEN" Masked "$TOOL"
+    ./alignment_tools.sh "$CHROM" "$LEN" Telo "$TOOL"
+    ./alignment_tools.sh "$CHROM" "$LEN" NoTelo "$TOOL"
+    ./alignment_tools.sh "$CHROM" "$LEN" Masked "$TOOL"
 done
 
 echo "=== FINISHED MINIMAP2 ==="
@@ -116,9 +116,9 @@ module add metabase/1
 
 echo "=== START PROCESSING ==="
 
-./gen_proc.sh "$CHROM" "$CHR_LENGTH" Telo
-./gen_proc.sh "$CHROM" "$CHR_LENGTH" NoTelo
-./gen_proc.sh "$CHROM" "$CHR_LENGTH" Masked
+./alignment_processing.sh "$CHROM" "$CHR_LENGTH" Telo
+./alignment_processing.sh "$CHROM" "$CHR_LENGTH" NoTelo
+./alignment_processing.sh "$CHROM" "$CHR_LENGTH" Masked
 
 echo "=== FINISHED PROCESSING ==="
 
