@@ -19,19 +19,19 @@ export R_LIBS_USER="/storage/brno12-cerit/home/xpetkov/Rlibs/4.4"
 mkdir -p $R_LIBS_USER
 
 SCRATCH=$SCRATCHDIR
-INPUT_DIR="/storage/brno12-cerit/home/xpetkov/basecall/results"
-HIST_DIR="/storage/brno12-cerit/home/xpetkov/basecall/results/histograms"
+INPUT_DIR="$PBS_O_WORKDIR/results"
+HIST_DIR="$PBS_O_WORKDIR/results/histograms"
 
 mkdir -p "$HIST_DIR"
 cd $SCRATCH
 
 echo "Copying R script..."
-cp /storage/brno2/home/xpetkov/genomes/basecall/basecall_histograms.R .
-cp /storage/brno2/home/xpetkov/genomes/basecall/basecall_comparison.R .
+cp "$PBS_O_WORKDIR"/basecall_histograms.R .
+cp "$PBS_O_WORKDIR"/basecall_comparison.R .
 
 echo "Running R..."
-Rscript basecall_histograms.R "$OUT_DIR"
-Rscript basecall_comparison.R "$OUT_DIR"
+Rscript basecall_histograms.R "$INPUT_DIR"
+Rscript basecall_comparison.R "$INPUT_DIR"
 
 echo "Copying results..."
 cp -r histograms/* "$HIST_DIR"

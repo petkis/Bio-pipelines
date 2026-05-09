@@ -29,9 +29,9 @@ TELO_TOOL="${TELO_TOOL:-telobp}"
 
 MODEL_TAG=$(echo $MODEL | tr '@' '_' | tr '.' '_')
 
-INPUT_POD5="/storage/brno12-cerit/home/xpetkov/basecall/final_pod5/telomeric_subset.pod5"
-FAST5_SOURCE="/storage/brno12-cerit/home/xpetkov/basecall/fast5_telomeric_subset"
-OUT_BASE=/storage/brno12-cerit/home/xpetkov/basecall/results"
+INPUT_POD5="$PBS_O_WORKDIR/dataset/Subset.pod5"
+FAST5_SOURCE="$PBS_O_WORKDIR/dataset/fast5_subset"
+OUT_BASE="$PBS_O_WORKDIR/results"
 
 OUT_DIR="${OUT_BASE}/${BASECALLER}_v${VERSION}_${MODEL_TAG}"
 mkdir -p "$OUT_DIR"
@@ -66,18 +66,15 @@ if [ "$BASECALLER" = "dorado" ]; then
     echo "Dorado OK"
 
     # ----------------------------
-    # MODEL HANDLING (CRITICAL FIX)
+    # MODEL HANDLING
     # ----------------------------
     echo "Using model: $MODEL"
-
-    # For old Dorado (0.8–0.9), skip strict checks
-    # Just attempt download and fail if incompatible
 
     echo "Downloading model..."
     "$DORADO_BIN" download --model "$MODEL" 2>&1 | tee model_download.log
 
     if [ $? -ne 0 ]; then
-        echo "ERROR: Model download failed → incompatible model/version"
+        echo "ERROR: Model download failed -> incompatible model/version"
         exit 1
     fi
 
@@ -107,7 +104,7 @@ if [ "$BASECALLER" = "dorado" ]; then
     # ----------------------------
     # CONVERT TO FASTQ
     # ----------------------------
-    echo "Converting BAM → FASTQ..."
+    echo "Converting BAM into FASTQ"
 
     samtools fastq basecalls.bam > reads.fastq
 
@@ -125,7 +122,7 @@ elif [ "$BASECALLER" = "guppy" ]; then
     tar -xzf guppy.tar.gz
 
     # =========================
-    # FIND INSTALL PATH (ROBUST)
+    # FIND INSTALL PATH
     # =========================
     GUPPY_DIR=$(find . -maxdepth 2 -type d -name "ont-guppy*" | head -n 1)
 
@@ -142,16 +139,13 @@ elif [ "$BASECALLER" = "guppy" ]; then
     echo "Config dir: $CONFIG_DIR"
 
     # =========================
-    # ROBUSTNESS CHECK #1 (binary)
+    # ROBUSTNESS CHECK
     # =========================
     if [ ! -x "$GUPPY_BIN" ]; then
         echo "ERROR: guppy_basecaller not found or not executable"
         exit 1
     fi
 
-    # =========================
-    # ROBUSTNESS CHECK #2 (config exists)
-    # =========================
     if [ ! -f "$CONFIG_DIR/$MODEL" ]; then
         echo "ERROR: Config $MODEL not found!"
         echo "Available configs:"
@@ -178,7 +172,7 @@ elif [ "$BASECALLER" = "guppy" ]; then
         --disable_qscore_filtering
 
     # =========================
-    # ROBUSTNESS CHECK #3 (output exists)
+    # OUTPUT CHECK
     # =========================
     if ! find guppy_out -name "*.fastq" | grep -q .; then
         echo "ERROR: No FASTQ files produced!"
@@ -215,23 +209,7 @@ if [ "$TELO_TOOL" = "ncrf" ] || [ "$TELO_TOOL" = "both" ]; then
     ./NCRF TTAGGG --maxnoise=20% --minlength=50 < ../reads.fasta > telo_G.ncrf
     ./NCRF CCCTAA --maxnoise=20% --minlength=50 < ../reads.fasta > telo_C.ncrf
 
-    cat << 'EOF' > extract.py
-out = open("telomere_lengths.tsv","w")
-out.write("read_id\tlength\tstrand\n")
-
-def parse(file, strand):
-    for line in open(file):
-        parts = line.strip().split()
-        if len(parts) < 4: continue
-        try:
-            out.write(f"{parts[0]}\t{int(parts[2].replace('bp',''))}\t{strand}\n")
-        except: pass
-
-parse("telo_G.ncrf","G")
-parse("telo_C.ncrf","C")
-out.close()
-EOF
-
+    cp "$PBS_O_WORKDIR/extract.py" .
     python3 extract.py
 
     module purge
