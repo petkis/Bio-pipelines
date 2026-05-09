@@ -6,9 +6,9 @@
 #PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/latest.err
 
 set -euo pipefail
-WORKDIR="/storage/brno2/home/xpetkov/genomes"
-DESTDIR="/storage/brno12-cerit/home/xpetkov"
-LOGSDIR="/storage/brno2/home/xpetkov/genomes/gen_logs"
+WORKDIR="$PBS_O_WORKDIR"
+DESTDIR="$PBS_O_WORKDIR/results"
+LOGSDIR="$PBS_O_WORKDIR/job_logs"
 
 mkdir -p "$LOGSDIR"
 
@@ -19,7 +19,7 @@ module add samtools
 
 TOOL="${TOOL:-winnowmap}"
 CHROM="${CHROM:-chr21_PATERNAL}"
-LENGTHS=(30000 20000)
+LENGTHS=(10000 20000 30000 40000)
 
 TOOL="${TOOL,,}"
 
@@ -38,14 +38,14 @@ cd "$PBS_O_WORKDIR"
 
 echo "Copying input data from $WORKDIR ..."
 
-cp "$WORKDIR/genome_masked.fa" "$SCRATCHDIR"/
-cp "$WORKDIR/genome_no_telomeres.fa" "$SCRATCHDIR"/
-cp "$WORKDIR/genome_telomeres.fa" "$SCRATCHDIR"/
+cp "$WORKDIR/dataset/genome_masked.fa" "$SCRATCHDIR"/
+cp "$WORKDIR/dataset/genome_no_telomeres.fa" "$SCRATCHDIR"/
+cp "$WORKDIR/dataset/genome_telomeres.fa" "$SCRATCHDIR"/
 
 echo "Copy of genomes finished"
 
-cp "$WORKDIR/gen_minimap2.sh" "$SCRATCHDIR"/
-cp "$WORKDIR/gen_proc.sh" "$SCRATCHDIR"/
+cp "$WORKDIR/alignment_tools.sh" "$SCRATCHDIR"/
+cp "$WORKDIR/alignment_processing.sh" "$SCRATCHDIR"/
 
 echo "Copy of scripts finished"
 
@@ -65,6 +65,11 @@ mkdir -p chroms
 samtools faidx genome_telomeres.fa
 CHR_LENGTH=$(awk -v c="$CHROM" '$1==c{print $2}' genome_telomeres.fa.fai)
 
+if [[ -z "$CHR_LENGTH" ]]; then
+    echo "ERROR: chromosome $CHROM not found in genome_telomeres.fa.fai" >&2
+    exit 1
+fi
+
 if (( CHR_LENGTH < 250000 )); then
   echo "ERROR: $CHROM length $CHR_LENGTH < 250000" >&2
   exit 1
@@ -82,6 +87,10 @@ else
 fi
 REGION="${CHROM}:${START}-${END}"
 echo "$REGION"
+
+samtools faidx genome_masked.fa
+samtools faidx genome_no_telomeres.fa
+samtools faidx genome_telomeres.fa
 
 samtools faidx genome_masked.fa       "$REGION" > "chroms/${CHROM}_Masked.fa"
 samtools faidx genome_no_telomeres.fa "$REGION" > "chroms/${CHROM}_NoTelo.fa"

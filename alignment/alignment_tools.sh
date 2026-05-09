@@ -85,7 +85,7 @@ for path in "${CHROMFA_DIR}"/*.fa; do
 
     infile="${CHROMFA_DIR}/${base}.fa"
     if [[ ! -f "$infile" ]]; then
-        echo "WARNING: missing $infile — skipping"
+        echo "WARNING: missing $infile => skipping"
         continue
     fi
 
@@ -96,7 +96,7 @@ for path in "${CHROMFA_DIR}"/*.fa; do
     fq="${outdir}/${chrom}_${subtype}_R1.fq"
     sam="${outdir}/aligned_${subtype}.sam"
 
-    echo "Simulating $chrom ($subtype) → $outdir"
+    echo "Simulating $chrom ($subtype) -> $outdir"
     "$WGSIM_BIN" \
       -N "$WGS_N" -1 "$WGS_LEN1" -2 "$WGS_LEN2" \
       -e "$WGS_ERR" -r "$WGS_MUT" \
@@ -104,7 +104,7 @@ for path in "${CHROMFA_DIR}"/*.fa; do
       -s "$WGS_SEED" \
       "$infile" "$fq" /dev/null
 
-    echo "Aligning → $sam"
+    echo "Aligning to $sam"
     if [[ "$TOOL" == "winnowmap" ]]; then
         "$TOOL" -t "$THREADS" -a -x "$MINIMAP_PRESET" \
             -W "$REP_K15" \
