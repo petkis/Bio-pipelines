@@ -15,3 +15,6 @@
 
 **/*.pod5
 **/*.fast5
+**/*.fa
+**/*.fasta
+**/meryl_clean
