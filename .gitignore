@@ -17,8 +17,9 @@
 **/*.fast5
 **/*.fa
 **/*.fasta
+**/*.fastq
 **/meryl_clean
 **/*.log
 **/*.out
 **/*.err
-**/results/*.*
+**/results/*

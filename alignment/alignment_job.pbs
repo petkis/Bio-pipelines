@@ -19,7 +19,7 @@ module add samtools
 
 TOOL="${TOOL:-winnowmap}"
 CHROM="${CHROM:-chr21_PATERNAL}"
-LENGTHS=(100)
+LENGTHS=(10000 20000 30000 40000)
 
 TOOL="${TOOL,,}"
 

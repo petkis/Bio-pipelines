@@ -1,222 +1,169 @@
 # Genome and Telomere Analysis Pipelines
 
-This repository contains PBS job scripts and helper scripts for running genome/telomere analysis workflows on an HPC cluster.
+This repository contains PBS scripts for genome/telomere analysis on an HPC cluster.
 
-The repository is organized around four main workflows:
+Main workflows:
 
 1. alignment simulation and processing
-2. aggregation and plotting of alignment results
+2. alignment result plotting
 3. ONT basecalling and telomere length estimation
-4. comparison and visualization of basecalling/telomere outputs
+4. basecalling/telomere result comparison
 
-The pipelines are designed to run from the repository root using `qsub`. PBS variables such as `$PBS_O_WORKDIR`, `$PBS_JOBID`, and `$SCRATCHDIR` are used throughout the scripts. `$PBS_O_WORKDIR` is the directory from which the job was submitted, and `$PBS_JOBID` is the scheduler-assigned job ID. :contentReference[oaicite:1]{index=1}
+Jobs are submitted with `qsub`. The scripts use `$PBS_O_WORKDIR` as the folder where the job was submitted and `$SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the working directory of the `qsub` command. :contentReference[oaicite:0]{index=0}
 
-## Important note about datasets
+## Dataset note
 
-The `dataset/` folders in this GitHub repository are intentionally empty or contain only small placeholder/README files.
+The `dataset/` folders are intentionally empty in GitHub because the real genome, POD5, FAST5, and sequencing files are too large for normal GitHub storage. GitHub warns for files larger than 50 MiB and blocks files larger than 100 MiB. :contentReference[oaicite:1]{index=1}
 
-Large genome FASTA files, POD5 files, FAST5 folders, and other sequencing data are not included because of GitHub file-size limitations. GitHub warns about files larger than 50 MiB and blocks files larger than 100 MiB. :contentReference[oaicite:2]{index=2}
+Before running anything, copy the required data into the correct `dataset/` folder. See the README files inside the dataset folders for details.
 
-Before running the scripts, place the required input data into the correct `dataset/` locations. Dataset-specific README files inside the `dataset/` folders describe what should be copied there.
-
-## General usage
-
-Submit jobs from the repository root:
-
-```bash
-cd /path/to/repository
-qsub script_name.pbs
-```
-
-Many parameters can be changed at submission time with `qsub -v`:
-
-```bash
-qsub -v VARIABLE=value script_name.pbs
-```
-
-For multiple variables:
-
-```bash
-qsub -v VARIABLE1=value1,VARIABLE2=value2 script_name.pbs
-```
-
-The scripts assume that they are submitted from the repository root. They use:
-
-```bash
-$PBS_O_WORKDIR
-```
-
-as the working directory and:
-
-```bash
-$SCRATCHDIR
-```
-
-as temporary scratch storage on the compute node.
-
-## Required software
-
-The PBS scripts load software through environment modules. Depending on the workflow, the following modules or tools are used:
+## Folder structure
 
 ```text
-samtools
-mambaforge
-metabase/1
-python36-modules-gcc
-python/3.11.11-gcc-10.2.1-555dlyc
-r-tidyverse
-r-ggplot2
-r/4.4.0-gcc-10.2.1-oxdi5pz
+alignment/
+├── alignment_pipeline.pbs
+├── genome_analysis_viz.pbs
+├── alignment_tools.sh
+├── alignment_processing.sh
+├── collect_results.py
+├── plot_results.R
+├── dataset/
+├── meryl_clean/
+└── results/
+
+basecall/
+├── basecall_pipeline.pbs
+├── telo_compare.pbs
+├── extract.py
+├── telomere_graphs.R
+├── basecall_histograms.R
+├── basecall_comparison.R
+├── dataset/
+└── results/
 ```
 
-External tools used by the workflows include:
+## Required input files
+
+### Alignment
+
+Place these files in `alignment/dataset/`:
 
 ```text
-winnowmap
-minimap2
-wgsim
-Dorado
-Guppy
-NCRF
-TeloBP
-samtools
-R
-Python
+genome_masked.fa
+genome_no_telomeres.fa
+genome_telomeres.fa
 ```
 
-`samtools faidx` is used to index FASTA files and extract chromosome regions. The `.fai` index allows efficient retrieval of specific FASTA/FASTQ regions. :contentReference[oaicite:3]{index=3}
+Purpose:
 
-## Input files
-
-### Genome FASTA files
-
-The alignment pipeline expects three versions of the genome:
-
-```text
-dataset/genome_masked.fa
-dataset/genome_no_telomeres.fa
-dataset/genome_telomeres.fa
-```
-
-These represent:
-
-| File | Purpose |
+| File | Meaning |
 |---|---|
-| `genome_masked.fa` | Genome version with selected repetitive/telomeric regions masked. Used to test how masking affects alignment. |
-| `genome_no_telomeres.fa` | Genome version with telomeric sequence removed. Used as a no-telomere comparison. |
-| `genome_telomeres.fa` | Genome version containing telomeric sequence. Used as the telomere-positive reference. |
+| `genome_masked.fa` | genome with selected regions masked |
+| `genome_no_telomeres.fa` | genome without telomeric regions |
+| `genome_telomeres.fa` | genome containing telomeric regions |
 
-The alignment script extracts the same chromosome arm region from all three FASTA files and compares how simulated reads align to each version.
-
-### Repetitive k-mer files
-
-The alignment pipeline also expects:
+The alignment pipeline also uses:
 
 ```text
-meryl_clean/repetitive_k15_telo.txt
-meryl_clean/repetitive_k15_notelo.txt
-meryl_clean/repetitive_k15_masked.txt
+alignment/meryl_clean/repetitive_k15_telo.txt
+alignment/meryl_clean/repetitive_k15_notelo.txt
+alignment/meryl_clean/repetitive_k15_masked.txt
 ```
 
-These files are used by the alignment tools, especially for workflows involving Winnowmap and repetitive k-mer filtering.
+### Basecalling
 
-### ONT basecalling inputs
-
-The basecalling pipeline expects either POD5 or FAST5 input, depending on the selected basecaller.
-
-For Dorado:
+Place these files in `basecall/dataset/`:
 
 ```text
-dataset/Subset.pod5
+Subset.pod5
+fast5_subset/
 ```
 
-For Guppy:
+Use `Subset.pod5` for Dorado and `fast5_subset/` for Guppy.
 
-```text
-dataset/fast5_subset/
-```
+## Workflow 1: alignment pipeline
 
-These files are not included in the GitHub repository. Place them manually according to the README files inside the dataset folders.
-
-### Example submissions
-
-(Run the commands from the alignment folder)
-Run the default alignment workflow:
+Run from the `alignment/` folder:
 
 ```bash
+cd alignment
 qsub alignment_pipeline.pbs
 ```
 
-Run Winnowmap on the p arm of `chr21_PATERNAL`:
+The script extracts a 250 kb region from the selected chromosome and runs alignment against the three genome versions: `Telo`, `NoTelo`, and `Masked`.
+
+Default parameters:
+
+```bash
+TOOL=winnowmap
+CHROM=chr21_PATERNAL
+ARM=p
+```
+
+Parameters:
+
+| Parameter | Values | Meaning |
+|---|---|---|
+| `TOOL` | `winnowmap`, `minimap2` | aligner |
+| `CHROM` | chromosome name | chromosome/contig to process |
+| `ARM` | `p`, `q` | start or end of chromosome |
+
+Examples:
 
 ```bash
 qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-```
-
-Run Winnowmap on the q arm:
-
-```bash
 qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
-```
-
-Run Minimap2 on the p arm:
-
-```bash
 qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-```
-
-Run Minimap2 on the q arm:
-
-```bash
 qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
 ```
-Used Lengths are changed manually inside the alignment_pipeline.pbs script
 
-## Workflow 2: collect and plot alignment results
+Read lengths are changed manually inside `alignment_pipeline.pbs`:
 
-PBS job:
-
-```text
-genome_analysis_viz.pbs
+```bash
+LENGTHS=(10000 20000 30000 40000)
 ```
 
-PBS job name:
+Output:
 
 ```text
-genome_analysis_viz
+alignment/results/{TOOL}_{ARM}_PROC_RESULTS_{CHROM}/
 ```
 
-Should be run after your desired alignment_pipeline.pbs runs.
+## Workflow 2: plot alignment results
 
-## Workflow 3: basecalling and telomere length estimation
-Should be run from basecall folder
-PBS job:
+Run after the alignment jobs finish:
+
+```bash
+cd alignment
+qsub genome_analysis_viz.pbs
+```
+
+This script collects `per_chrom_all.txt` files and creates combined plots.
+
+Output:
 
 ```text
-basecall_pipeline.pbs
+alignment/results/plots/
 ```
 
-PBS job name:
+If needed, set the mode:
 
-```text
-basecall_pipeline
+```bash
+qsub -v MODE=same genome_analysis_viz.pbs
 ```
 
-### Purpose
+## Workflow 3: basecalling and telomere detection
 
-This workflow basecalls ONT reads and then estimates telomere lengths using NCRF, TeloBP, or both.
+Run from the `basecall/` folder:
 
-It supports:
-
-```text
-Dorado
-Guppy
-NCRF
-TeloBP
+```bash
+cd basecall
+qsub basecall_pipeline.pbs
 ```
-### Parameters
 
-Default values:
+This script runs Dorado or Guppy, creates FASTQ reads, and detects telomeres with NCRF, TeloBP, or both.
+
+Default parameters:
 
 ```bash
 BASECALLER=dorado
@@ -225,84 +172,91 @@ MODEL=dna_r10.4.1_e8.2_400bps_sup@v5.2.0
 TELO_TOOL=both
 ```
 
-Parameter descriptions:
+Parameters:
 
-| Parameter | Allowed/example values | Meaning |
+| Parameter | Values | Meaning |
 |---|---|---|
-| `BASECALLER` | `dorado`, `guppy` | Which ONT basecaller to use. |
-| `VERSION` | e.g. `1.0.0` | Basecaller version to download/use. |
-| `MODEL` | Dorado model name or Guppy config file | Basecalling model/configuration. |
-| `TELO_TOOL` | `ncrf`, `telobp`, `both` | Telomere detection method. |
+| `BASECALLER` | `dorado`, `guppy` | basecaller |
+| `VERSION` | e.g. `1.0.0` | basecaller version |
+| `MODEL` | model/config name | Dorado model or Guppy config |
+| `TELO_TOOL` | `ncrf`, `telobp`, `both` | telomere detection tool |
 
-### Dorado input
-
-For Dorado, the script expects:
-
-```text
-dataset/Subset.pod5
-```
-
-The script copies it to scratch as:
-
-```text
-input.pod5
-```
-
-Dorado produces BAM output, which is converted to FASTQ with:
-
-```bash
-samtools fastq basecalls.bam > reads.fastq
-```
-
-### Guppy input
-
-For Guppy, the script expects:
-
-```text
-dataset/fast5_subset/
-```
-
-### Example submissions
-
-Run Dorado with the default model and both telomere tools:
+Examples:
 
 ```bash
 qsub basecall_pipeline.pbs
-```
-
-Run Dorado with NCRF only:
-
-```bash
 qsub -v BASECALLER=dorado,TELO_TOOL=ncrf basecall_pipeline.pbs
-```
-
-Run Dorado with TeloBP only:
-
-```bash
 qsub -v BASECALLER=dorado,TELO_TOOL=telobp basecall_pipeline.pbs
-```
-
-Run Guppy:
-
-```bash
-qsub -v BASECALLER=guppy,VERSION=<guppy_version>,MODEL=<guppy_config>.cfg,TELO_TOOL=both basecall_pipeline.pbs
-```
-
-Example Guppy-style command:
-
-```bash
 qsub -v BASECALLER=guppy,VERSION=6.5.7,MODEL=dna_r10.4.1_e8.2_400bps_sup.cfg,TELO_TOOL=both basecall_pipeline.pbs
 ```
-## Workflow 4: compare basecalling and telomere results
 
-PBS job:
-
-```text
-telo_compare.pbs
-```
-
-PBS job name:
+Output:
 
 ```text
-telo_compare
+basecall/results/{BASECALLER}_v{VERSION}_{MODEL_TAG}/
 ```
+
+Main outputs:
+
+```text
+reads.fastq
+ncrf/telomere_lengths.tsv
+telobp/telomere_lengths.tsv
+```
+
+## Workflow 4: compare basecalling results
+
+Run after one or more basecalling jobs finish:
+
+```bash
+cd basecall
+qsub telo_compare.pbs
+```
+
+This script compares telomere length results and creates histograms/summary files.
+
+Output:
+
+```text
+basecall/results/histograms/
+```
+
+## Typical run order
+
+```bash
+cd alignment
+
+qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
+qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
+qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
+qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
+
+qsub genome_analysis_viz.pbs
+```
+
+```bash
+cd basecall
+
+qsub -v BASECALLER=dorado,TELO_TOOL=both basecall_pipeline.pbs
+qsub telo_compare.pbs
+```
+
+## Logs
+
+Logs are written to:
+
+```text
+gen_logs/
+job_logs/
+```
+
+Some jobs also write logs directly into the workflow folder.
+
+## Notes
+
+- Submit jobs from the correct workflow folder.
+- Put large input data into `dataset/` manually.
+- Do not commit large sequencing/genome files to GitHub.
+- Alignment outputs are stored in `alignment/results/`.
+- Basecalling outputs are stored in `basecall/results/`.
+- Temporary files are created in `$SCRATCHDIR` and cleaned after the job.
