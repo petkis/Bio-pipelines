@@ -9,11 +9,11 @@ Main workflows:
 3. ONT basecalling and telomere length estimation
 4. basecalling/telomere result comparison
 
-Jobs are submitted with `qsub`. The scripts use `$PBS_O_WORKDIR` as the folder where the job was submitted and `$SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the working directory of the `qsub` command. :contentReference[oaicite:0]{index=0}
+Jobs are submitted with `qsub`. The scripts use `$PBS_O_WORKDIR` as the folder where the job was submitted and `$SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the working directory of the `qsub` command.
 
 ## Dataset note
 
-The `dataset/` folders are intentionally empty in GitHub because the real genome, POD5, FAST5, and sequencing files are too large for normal GitHub storage. GitHub warns for files larger than 50 MiB and blocks files larger than 100 MiB. :contentReference[oaicite:1]{index=1}
+The `dataset/` folders are intentionally empty in GitHub because the real genome, POD5, FAST5, and sequencing files are too large for normal GitHub storage. GitHub warns for files larger than 50 MiB and blocks files larger than 100 MiB.
 
 Before running anything, copy the required data into the correct `dataset/` folder. See the README files inside the dataset folders for details.
 
@@ -246,7 +246,6 @@ qsub telo_compare.pbs
 Logs are written to:
 
 ```text
-gen_logs/
 job_logs/
 ```
 

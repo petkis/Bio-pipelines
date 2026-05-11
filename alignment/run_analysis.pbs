@@ -2,15 +2,19 @@
 #PBS -N genome_analysis_viz
 #PBS -l select=1:ncpus=1:mem=24gb:scratch_local=20gb
 #PBS -l walltime=01:00:00
-#PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/viz.out
-#PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/viz.err
+#PBS -o visualization.out
+#PBS -e visualization.err
 
 set -euo pipefail
 trap 'clean_scratch' EXIT TERM
 
-MODE="${MODE:-same}"
+LOGSDIR="$PBS_O_WORKDIR/job_logs"
+mkdir -p "$LOGSDIR"
 
-echo "Running with MODE=$MODE"
+exec >"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.out"
+exec 2>"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.err"
+
+MODE="${MODE:-same}"
 
 INPUT_DATA_DIR="$PBS_O_WORKDIR/results"
 OUTPUT_DIR="$PBS_O_WORKDIR/results/plots"

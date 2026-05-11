@@ -2,10 +2,11 @@
 #PBS -N alignment_pipeline
 #PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
 #PBS -l walltime=24:00:00
-#PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/latest.out
-#PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/latest.err
+#PBS -o latest_align.out
+#PBS -e latest_align.err
 
 set -euo pipefail
+
 WORKDIR="$PBS_O_WORKDIR"
 DESTDIR="$PBS_O_WORKDIR/results"
 LOGSDIR="$PBS_O_WORKDIR/job_logs"

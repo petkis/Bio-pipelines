@@ -7,6 +7,11 @@
 
 set -euo pipefail
 
+LOGSDIR="$PBS_O_WORKDIR/job_logs"
+mkdir -p "$LOGSDIR"
+
+exec >"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.log" 2>&1
+
 trap 'clean_scratch' EXIT TERM
 
 echo "Job started on $(hostname) at $(date)"
