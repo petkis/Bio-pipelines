@@ -146,12 +146,6 @@ Output:
 alignment/results/plots/
 ```
 
-If needed, set the mode:
-
-```bash
-qsub -v MODE=same genome_analysis_viz.pbs
-```
-
 ## Workflow 3: basecalling and telomere detection
 
 Run from the `basecall/` folder:
