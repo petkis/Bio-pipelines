@@ -1,0 +1,2 @@
+chr21_PATERNAL 2
+chr3_PATERNAL 1

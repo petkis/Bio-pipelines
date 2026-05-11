@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N alignment_pipeline
 #PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
-#PBS -l walltime=48:00:00
+#PBS -l walltime=24:00:00
 #PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/latest.out
 #PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/latest.err
 
@@ -19,7 +19,7 @@ module add samtools
 
 TOOL="${TOOL:-winnowmap}"
 CHROM="${CHROM:-chr21_PATERNAL}"
-LENGTHS=(10000 20000 30000 40000)
+LENGTHS=(100)
 
 TOOL="${TOOL,,}"
 

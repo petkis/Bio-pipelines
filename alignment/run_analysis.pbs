@@ -1,0 +1,58 @@
+#!/bin/bash
+#PBS -N genome_analysis_viz
+#PBS -l select=1:ncpus=1:mem=24gb:scratch_local=20gb
+#PBS -l walltime=01:00:00
+#PBS -o /storage/brno2/home/xpetkov/genomes/gen_logs/viz.out
+#PBS -e /storage/brno2/home/xpetkov/genomes/gen_logs/viz.err
+
+set -euo pipefail
+trap 'clean_scratch' EXIT TERM
+
+MODE="${MODE:-same}"
+
+echo "Running with MODE=$MODE"
+
+INPUT_DATA_DIR="$PBS_O_WORKDIR/results"
+OUTPUT_DIR="$PBS_O_WORKDIR/results/plots"
+SCRIPT_DIR="$PBS_O_WORKDIR"
+
+echo "Moving to scratch..."
+cd "$SCRATCHDIR"
+
+echo "Copying scripts..."
+cp "$SCRIPT_DIR/collect_results.py" .
+cp "$SCRIPT_DIR/plot_results.R" .
+
+echo "Copying only per_chrom_all.txt using rsync..."
+
+rsync -av --prune-empty-dirs \
+    --include="*/" \
+    --include="per_chrom_all.txt" \
+    --exclude="*" \
+    "$INPUT_DATA_DIR"/ ./
+
+# 3. Load Modules
+module purge
+module add python36-modules-gcc
+
+# 4. Run Python Aggregator
+echo "Starting Python data aggregation..."
+export MODE=$MODE
+
+python3 collect_results.py
+
+module purge
+module add metabase/1
+module add r-tidyverse
+
+# 5. Run R Visualization
+echo "Starting R visualization..."
+Rscript plot_results.R
+
+# 6. Copy results back
+echo "Cleaning up and copying results to $OUTPUT_DIR..."
+mkdir -p "$OUTPUT_DIR"
+cp combined_results.csv "$OUTPUT_DIR/"
+cp *.pdf "$OUTPUT_DIR/" || true
+
+echo "DONE."

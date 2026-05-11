@@ -25,7 +25,7 @@ module add samtools/1.14-gcc
 BASECALLER="${BASECALLER:-dorado}"
 VERSION="${VERSION:-1.0.0}"
 MODEL="${MODEL:-dna_r10.4.1_e8.2_400bps_sup@v5.2.0}"
-TELO_TOOL="${TELO_TOOL:-telobp}"
+TELO_TOOL="${TELO_TOOL:-both}"
 
 MODEL_TAG=$(echo $MODEL | tr '@' '_' | tr '.' '_')
 

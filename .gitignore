@@ -18,3 +18,7 @@
 **/*.fa
 **/*.fasta
 **/meryl_clean
+**/*.log
+**/*.out
+**/*.err
+**/results/*.*
