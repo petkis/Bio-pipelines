@@ -12,6 +12,7 @@
 # allow all contents inside them
 !alignment/**
 !basecall/**
+!**/results/
 
 **/*.pod5
 **/*.fast5
