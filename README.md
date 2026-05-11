@@ -22,7 +22,7 @@ Before running anything, copy the required data into the correct `dataset/` fold
 ```text
 alignment/
 ├── alignment_pipeline.pbs
-├── genome_analysis_viz.pbs
+├── run_analysis.pbs
 ├── alignment_tools.sh
 ├── alignment_processing.sh
 ├── collect_results.py
@@ -135,7 +135,7 @@ Run after the alignment jobs finish:
 
 ```bash
 cd alignment
-qsub genome_analysis_viz.pbs
+qsub run_analysis.pbs
 ```
 
 This script collects `per_chrom_all.txt` files and creates combined plots.
@@ -225,7 +225,7 @@ qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
 qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
 qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
 
-qsub genome_analysis_viz.pbs
+qsub run_analysis.pbs
 ```
 
 ```bash
