@@ -1,23 +1,27 @@
 # Genome and Telomere Analysis Pipelines
 
-This repository contains PBS scripts for genome/telomere analysis on an HPC cluster.
+This repository contains PBS scripts for genome alignment analysis and Oxford Nanopore telomere length analysis on an HPC cluster.
 
-Main workflows:
+The repository is split into two separate pipelines:
 
-1. alignment simulation and processing
-2. alignment result plotting
-3. ONT basecalling and telomere length estimation
-4. basecalling/telomere result comparison
+1. `alignment/` – alignment simulation, alignment processing, and alignment result plotting.
+2. `basecall/` – ONT basecalling, telomere length estimation, and basecaller/tool comparison.
 
-Jobs are submitted with `qsub`. The scripts use `$PBS_O_WORKDIR` as the folder where the job was submitted and `$SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the working directory of the `qsub` command.
+Jobs are submitted with `qsub`. The scripts use `PBS_O_WORKDIR` as the folder where the job was submitted, and `SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the current working directory of the `qsub` command, so jobs must be submitted from the correct pipeline folder.
 
-## Dataset note
+## Why this repository exists
 
-The `dataset/` folders are intentionally empty in GitHub because the real genome, POD5, FAST5, and sequencing files are too large for normal GitHub storage. GitHub warns for files larger than 50 MiB and blocks files larger than 100 MiB.
+Telomeric regions are repetitive and difficult to analyze with standard sequencing and alignment workflows. This repository provides reproducible HPC workflows for testing how different alignment references, aligners, basecallers, and telomere detection tools affect telomere-related results.
 
-Before running anything, copy the required data into the correct `dataset/` folder. See the README files inside the dataset folders for details.
+The alignment pipeline compares mapping behavior against three genome versions:
 
-## Folder structure
+- genome containing telomeric regions
+- genome without telomeric regions
+- genome with selected regions masked
+
+The basecall pipeline compares telomere length estimates produced from different ONT basecalling and telomere detection configurations.
+
+## Repository structure
 
 ```text
 alignment/
@@ -40,216 +44,47 @@ basecall/
 ├── basecall_comparison.R
 ├── dataset/
 └── results/
-```
 
-## Required input files
+## Alignment pipeline
 
-### Alignment
-
-Place these files in `alignment/dataset/`:
-
-```text
-genome_masked.fa
-genome_no_telomeres.fa
-genome_telomeres.fa
-```
-
-Purpose:
-
-| File | Meaning |
-|---|---|
-| `genome_masked.fa` | genome with selected regions masked |
-| `genome_no_telomeres.fa` | genome without telomeric regions |
-| `genome_telomeres.fa` | genome containing telomeric regions |
-
-The alignment pipeline also uses:
-
-```text
-alignment/meryl_clean/repetitive_k15_telo.txt
-alignment/meryl_clean/repetitive_k15_notelo.txt
-alignment/meryl_clean/repetitive_k15_masked.txt
-```
-
-### Basecalling
-
-Place these files in `basecall/dataset/`:
-
-```text
-Subset.pod5
-fast5_subset/
-```
-
-Use `Subset.pod5` for Dorado and `fast5_subset/` for Guppy.
-
-## Workflow 1: alignment pipeline
-
-Run from the `alignment/` folder:
-
-```bash
-cd alignment
-qsub alignment_pipeline.pbs
-```
-
-The script extracts a 250 kb region from the selected chromosome and runs alignment against the three genome versions: `Telo`, `NoTelo`, and `Masked`.
-
-Default parameters:
-
-```bash
-TOOL=winnowmap
-CHROM=chr21_PATERNAL
-ARM=p
-```
-
-Parameters:
-
-| Parameter | Values | Meaning |
-|---|---|---|
-| `TOOL` | `winnowmap`, `minimap2` | aligner |
-| `CHROM` | chromosome name | chromosome/contig to process |
-| `ARM` | `p`, `q` | start or end of chromosome |
-
-Examples:
-
-```bash
-qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
-qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
-```
-
-Read lengths are changed manually inside `alignment_pipeline.pbs`:
-
-```bash
-LENGTHS=(10000 20000 30000 40000)
-```
-
-Output:
-
-```text
+alignment/dataset/
+    genome_masked.fa
+    genome_no_telomeres.fa
+    genome_telomeres.fa
+        │
+        ▼
+alignment_pipeline.pbs
+    - extracts a 250 kb chromosome-arm region
+    - prepares Telo / NoTelo / Masked reference regions
+    - simulates reads for selected read lengths
+    - aligns reads with minimap2 or winnowmap
+    - processes alignment results
+        │
+        ▼
 alignment/results/{TOOL}_{ARM}_PROC_RESULTS_{CHROM}/
-```
 
-## Workflow 2: plot alignment results
-
-Run after the alignment jobs finish:
-
-```bash
-cd alignment
-qsub run_analysis.pbs
-```
-
-This script collects `per_chrom_all.txt` files and creates combined plots.
-
-Output:
-
-```text
 alignment/results/plots/
-```
 
-## Workflow 3: basecalling and telomere detection
+## Basecaller pipeline
 
-Run from the `basecall/` folder:
-
-```bash
-cd basecall
-qsub basecall_pipeline.pbs
-```
-
-This script runs Dorado or Guppy, creates FASTQ reads, and detects telomeres with NCRF, TeloBP, or both.
-
-Default parameters:
-
-```bash
-BASECALLER=dorado
-VERSION=1.0.0
-MODEL=dna_r10.4.1_e8.2_400bps_sup@v5.2.0
-TELO_TOOL=both
-```
-
-Parameters:
-
-| Parameter | Values | Meaning |
-|---|---|---|
-| `BASECALLER` | `dorado`, `guppy` | basecaller |
-| `VERSION` | e.g. `1.0.0` | basecaller version |
-| `MODEL` | model/config name | Dorado model or Guppy config |
-| `TELO_TOOL` | `ncrf`, `telobp`, `both` | telomere detection tool |
-
-Examples:
-
-```bash
-qsub basecall_pipeline.pbs
-qsub -v BASECALLER=dorado,TELO_TOOL=ncrf basecall_pipeline.pbs
-qsub -v BASECALLER=dorado,TELO_TOOL=telobp basecall_pipeline.pbs
-qsub -v BASECALLER=guppy,VERSION=6.5.7,MODEL=dna_r10.4.1_e8.2_400bps_sup.cfg,TELO_TOOL=both basecall_pipeline.pbs
-```
-
-Output:
-
-```text
+basecall/dataset/
+    Subset.pod5      → Dorado
+    fast5_subset/    → Guppy
+        │
+        ▼
+basecall_pipeline.pbs
+    - runs Dorado or Guppy
+    - creates reads.fastq
+    - runs NCRF, TeloBP, or both
+    - creates telomere length tables and per-run plots
+        │
+        ▼
 basecall/results/{BASECALLER}_v{VERSION}_{MODEL_TAG}/
-```
-
-Main outputs:
-
-```text
-reads.fastq
-ncrf/telomere_lengths.tsv
-telobp/telomere_lengths.tsv
-```
-
-## Workflow 4: compare basecalling results
-
-Run after one or more basecalling jobs finish:
-
-```bash
-cd basecall
-qsub telo_compare.pbs
-```
-
-This script compares telomere length results and creates histograms/summary files.
-
-Output:
-
-```text
+        │
+        ▼
+telo_compare.pbs
+    - compares telomere length outputs
+    - creates histograms, summary files, and violin plots
+        │
+        ▼
 basecall/results/histograms/
-```
-
-## Typical run order
-
-```bash
-cd alignment
-
-qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-qsub -v TOOL=winnowmap,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
-qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=p alignment_pipeline.pbs
-qsub -v TOOL=minimap2,CHROM=chr21_PATERNAL,ARM=q alignment_pipeline.pbs
-
-qsub run_analysis.pbs
-```
-
-```bash
-cd basecall
-
-qsub -v BASECALLER=dorado,TELO_TOOL=both basecall_pipeline.pbs
-qsub telo_compare.pbs
-```
-
-## Logs
-
-Logs are written to:
-
-```text
-job_logs/
-```
-
-Some jobs also write logs directly into the workflow folder.
-
-## Notes
-
-- Submit jobs from the correct workflow folder.
-- Put large input data into `dataset/` manually.
-- Do not commit large sequencing/genome files to GitHub.
-- Alignment outputs are stored in `alignment/results/`.
-- Basecalling outputs are stored in `basecall/results/`.
-- Temporary files are created in `$SCRATCHDIR` and cleaned after the job.
