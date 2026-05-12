@@ -1,90 +1,174 @@
-# Genome and Telomere Analysis Pipelines
+# Bio-pipelines
 
-This repository contains PBS scripts for genome alignment analysis and Oxford Nanopore telomere length analysis on an HPC cluster.
+This repository contains HPC-based pipelines used for long-read sequencing analysis in telomeric and chromosome-level regions.
 
-The repository is split into two separate pipelines:
+The project contains two main workflows:
 
-1. `alignment/` – alignment simulation, alignment processing, and alignment result plotting.
-2. `basecall/` – ONT basecalling, telomere length estimation, and basecaller/tool comparison.
+1. **Alignment pipeline** – simulation and alignment of reads from selected chromosome-arm regions.
+2. **Basecalling pipeline** – Oxford Nanopore basecalling and telomere length estimation.
 
-Jobs are submitted with `qsub`. The scripts use `PBS_O_WORKDIR` as the folder where the job was submitted, and `SCRATCHDIR` for temporary job files. `PBS_O_WORKDIR` is the current working directory of the `qsub` command, so jobs must be submitted from the correct pipeline folder.
+The scripts are designed for execution on a PBS-based HPC cluster using `qsub`. Most computation is performed in `$SCRATCHDIR`, and final outputs are copied back to the corresponding `results/` folders.
 
-## Why this repository exists
+---
 
-Telomeric regions are repetitive and difficult to analyze with standard sequencing and alignment workflows. This repository provides reproducible HPC workflows for testing how different alignment references, aligners, basecallers, and telomere detection tools affect telomere-related results.
+## Purpose
 
-The alignment pipeline compares mapping behavior against three genome versions:
+Telomeric and other repetitive genomic regions are difficult to analyze because they can affect both basecalling and read alignment. This repository provides reproducible scripts for evaluating how different tools and reference genome variants influence the analysis of long-read sequencing data.
 
-- genome containing telomeric regions
-- genome without telomeric regions
-- genome with selected regions masked
+The repository was created as part of a bachelor thesis focused on long-read sequencing, telomere-related analysis, basecaller comparison, and alignment behavior in chromosome-level regions.
 
-The basecall pipeline compares telomere length estimates produced from different ONT basecalling and telomere detection configurations.
+---
 
 ## Repository structure
 
 ```text
-alignment/
-├── alignment_pipeline.pbs
-├── run_analysis.pbs
-├── alignment_tools.sh
-├── alignment_processing.sh
-├── collect_results.py
-├── plot_results.R
-├── dataset/
-├── meryl_clean/
-└── results/
+Bio-pipelines/
+├── alignment/
+│   ├── README.md
+│   ├── alignment_job.pbs
+│   ├── alignment_tools.sh
+│   ├── alignment_processing.sh
+│   ├── collect_results.py
+│   ├── plot_results.R
+│   ├── run_analysis.pbs
+│   ├── multi_sub_job.sh
+│   ├── chromosome_list.txt
+│   ├── dataset/
+│   ├── meryl_clean/
+│   └── results/
+│
+└── basecall/
+    ├── README.md
+    ├── basecall_pipeline.pbs
+    ├── visualise_results.pbs
+    ├── extract.py
+    ├── telomere_graphs.R
+    ├── basecall_histograms.R
+    ├── basecall_comparison.R
+    ├── dataset/
+    └── results/
+```
 
-basecall/
-├── basecall_pipeline.pbs
-├── telo_compare.pbs
-├── extract.py
-├── telomere_graphs.R
-├── basecall_histograms.R
-├── basecall_comparison.R
-├── dataset/
-└── results/
+---
 
-## Alignment pipeline
+## Pipelines
 
+### Alignment pipeline
+
+The alignment pipeline simulates reads from selected chromosome-arm regions and aligns them to different reference genome variants.
+
+It compares three reference types:
+
+| Reference type | Description |
+|---|---|
+| `Telo` | Reference genome containing telomeric regions |
+| `NoTelo` | Reference genome without telomeric regions |
+| `Masked` | Reference genome with selected regions masked |
+
+The pipeline supports two aligners:
+
+| Tool | Purpose |
+|---|---|
+| `minimap2` | Standard long-read aligner used as a baseline |
+| `winnowmap` | Long-read aligner designed to improve mapping in repetitive regions |
+
+Detailed instructions are available in:
+
+```text
+alignment/README.md
+```
+
+---
+
+### Basecalling pipeline
+
+The basecalling pipeline processes Oxford Nanopore raw signal data, generates long reads, estimates telomere lengths, and creates comparison plots.
+
+It supports two basecallers:
+
+| Basecaller | Input format |
+|---|---|
+| Dorado | POD5 |
+| Guppy | FAST5 |
+
+It supports telomere length estimation using:
+
+| Tool | Purpose |
+|---|---|
+| NCRF | Detection of telomeric repeat regions in reads |
+| TeloBP | Telomere length estimation from long-read sequencing data |
+
+Detailed instructions are available in:
+
+```text
+basecall/README.md
+```
+
+---
+
+## Dataset availability
+
+Large input datasets are not stored directly in this Git repository.
+
+Expected dataset locations:
+
+```text
 alignment/dataset/
-    genome_masked.fa
-    genome_no_telomeres.fa
-    genome_telomeres.fa
-        │
-        ▼
-alignment_pipeline.pbs
-    - extracts a 250 kb chromosome-arm region
-    - prepares Telo / NoTelo / Masked reference regions
-    - simulates reads for selected read lengths
-    - aligns reads with minimap2 or winnowmap
-    - processes alignment results
-        │
-        ▼
-alignment/results/{TOOL}_{ARM}_PROC_RESULTS_{CHROM}/
-
-alignment/results/plots/
-
-## Basecaller pipeline
-
 basecall/dataset/
-    Subset.pod5      → Dorado
-    fast5_subset/    → Guppy
-        │
-        ▼
-basecall_pipeline.pbs
-    - runs Dorado or Guppy
-    - creates reads.fastq
-    - runs NCRF, TeloBP, or both
-    - creates telomere length tables and per-run plots
-        │
-        ▼
-basecall/results/{BASECALLER}_v{VERSION}_{MODEL_TAG}/
-        │
-        ▼
-telo_compare.pbs
-    - compares telomere length outputs
-    - creates histograms, summary files, and violin plots
-        │
-        ▼
-basecall/results/histograms/
+```
+
+A permanent archive of the dataset and selected generated results should be provided through Zenodo or another long-term storage service.
+
+```text
+Zenodo DOI: TODO
+```
+
+---
+
+## Current results
+
+Generated results are stored in:
+
+```text
+alignment/results/
+basecall/results/
+```
+
+The main result types include:
+
+- alignment statistics,
+- chromosome-level mapping summaries,
+- basecaller comparison tables,
+- telomere length estimates,
+- histograms,
+- violin plots,
+- runtime and computational requirement summaries.
+
+---
+
+## Running the workflows
+
+All major workflows are executed as PBS jobs.
+
+Example alignment job:
+
+```bash
+cd alignment
+qsub -v CHROM=chr21_PATERNAL,ARM=p,TOOL=winnowmap alignment_job.pbs
+```
+
+Example basecalling job:
+
+```bash
+cd basecall
+qsub -v BASECALLER=dorado,VERSION=1.4.0,MODEL=dna_r10.4.1_e8.2_400bps_sup@v5.2.0,TELO_TOOL=both basecall_pipeline.pbs
+```
+
+---
+
+## General notes
+
+- Jobs should be submitted from the correct pipeline directory.
+- The scripts rely on `$PBS_O_WORKDIR` and `$SCRATCHDIR`.
+- Large sequencing files and large generated outputs should not be committed to Git.
+- The repository is intended to document and reproduce the computational workflows used in the bachelor thesis.

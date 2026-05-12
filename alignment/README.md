@@ -1,30 +1,67 @@
 # Alignment Pipeline
 
-This folder contains the alignment workflow for testing how reads from telomeric chromosome-arm regions align to different genome references.
+This folder contains the alignment workflow used to test how simulated long reads from selected chromosome-arm regions map to different reference genome variants.
 
-The workflow extracts a 250 kb region from the selected chromosome arm, prepares three reference variants, simulates reads of selected lengths, aligns them with either `winnowmap` or `minimap2`, and processes the resulting alignments.
+The pipeline is designed for execution on a PBS-based HPC cluster.
+
+---
 
 ## Purpose
 
-The alignment pipeline is used to compare how telomeric or masked reference content affects read mapping. It runs the same analysis against three genome versions:
+The goal of this pipeline is to evaluate how the presence, absence, or masking of telomeric regions in the reference genome affects long-read alignment.
 
-| Reference type | Meaning |
+The workflow simulates reads from selected chromosome-arm regions and aligns them to three reference genome variants:
+
+| Reference type | Description |
 |---|---|
-| `Telo` | Genome containing telomeric regions |
-| `NoTelo` | Genome without telomeric regions |
-| `Masked` | Genome with selected regions masked |
+| `Telo` | Reference genome containing telomeric regions |
+| `NoTelo` | Reference genome without telomeric regions |
+| `Masked` | Reference genome with selected regions masked |
 
-The pipeline can be used to evaluate differences in alignment quality, mapping behavior, and read placement near telomeric chromosome-arm regions.
+Two aligners can be used:
 
-## Required input files
+| Aligner | Description |
+|---|---|
+| `minimap2` | Baseline long-read aligner |
+| `winnowmap` | Long-read aligner with improved handling of repetitive regions |
 
-Place these files in:
+---
+
+## Pipeline overview
+
+```text
+Reference genomes
+    ↓
+Select chromosome and chromosome arm
+    ↓
+Extract 250 kb chromosome-arm region
+    ↓
+Prepare Telo / NoTelo / Masked region FASTA files
+    ↓
+Simulate reads using wgsim
+    ↓
+Align reads using minimap2 or winnowmap
+    ↓
+Convert SAM to sorted and indexed BAM
+    ↓
+Generate alignment statistics
+    ↓
+Collect results into CSV tables
+    ↓
+Create chromosome-level plots
+```
+
+---
+
+## Input files
+
+Reference genomes must be placed in:
 
 ```text
 alignment/dataset/
 ```
 
-Required files:
+Expected files:
 
 ```text
 genome_masked.fa
@@ -32,105 +69,167 @@ genome_no_telomeres.fa
 genome_telomeres.fa
 ```
 
-The workflow expects all three reference FASTA files to be available before running.
-
-## Main workflow
-
-The main Snakefile is:
+For Winnowmap, repetitive k-mer files are expected in:
 
 ```text
-alignment/Snakefile
+alignment/meryl_clean/
 ```
 
-The workflow performs the following steps:
-
-1. Selects a chromosome arm and extracts a 250 kb region.
-2. Builds reference-specific input files.
-3. Simulates reads from the selected region.
-4. Aligns reads to each reference genome.
-5. Converts, sorts, and indexes alignment files.
-6. Produces output files for downstream comparison.
-
-## Configuration
-
-Pipeline settings are defined in the Snakemake configuration file, usually:
+Expected files:
 
 ```text
-alignment/config.yaml
+repetitive_k15_telo.txt
+repetitive_k15_notelo.txt
+repetitive_k15_masked.txt
 ```
 
-Typical configurable values include:
+---
 
-| Parameter | Description |
+## Main scripts
+
+| Script | Purpose |
 |---|---|
-| `chromosome` | Chromosome used for region extraction |
-| `arm` | Chromosome arm or region to analyze |
-| `read_lengths` | Read lengths used for simulation |
-| `aligner` | Aligner to use, such as `winnowmap` or `minimap2` |
-| `threads` | Number of CPU threads used by selected rules |
+| `alignment_job.pbs` | Main PBS job. Runs one complete alignment workflow for a selected chromosome, arm, and aligner. |
+| `alignment_tools.sh` | Simulates reads and aligns them using `minimap2` or `winnowmap`. |
+| `alignment_processing.sh` | Converts SAM to BAM, sorts and indexes BAM files, and generates mapping statistics. |
+| `collect_results.py` | Collects chromosome-level alignment summaries into a combined CSV file. |
+| `plot_results.R` | Creates plots from the collected alignment results. |
+| `run_analysis.pbs` | Runs result aggregation and plotting on the HPC cluster. |
+| `multi_sub_job.sh` | Submits multiple alignment jobs using chromosomes listed in `chromosome_list.txt`. |
+| `chromosome_list.txt` | List of chromosomes used for batch submission. |
 
-Update the configuration file before running the workflow.
+---
 
-## Running the pipeline
+## Running one alignment job
 
-From the repository root, run:
-
-```bash
-snakemake -s alignment/Snakefile --cores 8
-```
-
-To perform a dry run first:
+Submit the job from the `alignment/` directory:
 
 ```bash
-snakemake -s alignment/Snakefile --cores 8 -n
+cd alignment
+qsub -v CHROM=chr21_PATERNAL,ARM=p,TOOL=winnowmap alignment_job.pbs
 ```
 
-To print the commands without executing them:
+Available variables:
+
+| Variable | Example | Description |
+|---|---|---|
+| `CHROM` | `chr21_PATERNAL` | Chromosome to analyze |
+| `ARM` | `p` or `q` | Chromosome arm |
+| `TOOL` | `minimap2` or `winnowmap` | Aligner used for mapping |
+
+If variables are not provided, default values defined inside `alignment_job.pbs` are used.
+
+---
+
+## Running multiple alignment jobs
+
+To submit jobs for multiple chromosomes, edit:
+
+```text
+chromosome_list.txt
+```
+
+Then run:
 
 ```bash
-snakemake -s alignment/Snakefile --cores 8 -n -p
+cd alignment
+bash multi_sub_job.sh
 ```
 
-## Output
+Each chromosome listed in `chromosome_list.txt` is submitted as a separate PBS job.
 
-The pipeline produces alignment-related output files such as:
+---
+
+## Generating summary tables and plots
+
+After the alignment jobs finish, run:
+
+```bash
+cd alignment
+qsub -v MODE=same run_analysis.pbs
+```
+
+The `MODE` variable controls how correct mapping is evaluated.
+
+| Mode | Description |
+|---|---|
+| `same` | Correct mapping is evaluated against the same chromosome or haplotype. |
+| `cross` | Correct mapping is evaluated against the opposite chromosome or haplotype pair. |
+
+---
+
+## Output files
+
+Main outputs are written to:
 
 ```text
 alignment/results/
-alignment/logs/
-alignment/benchmark/
 ```
 
-Depending on the configuration, expected outputs may include:
+Summary plots and collected result tables are written to:
 
 ```text
-*.sam
-*.bam
-*.sorted.bam
-*.sorted.bam.bai
+alignment/results/plots/
 ```
 
-These files can be used to inspect mapping quality and compare alignment behavior between reference types.
+Important output files include:
+
+```text
+aligned.sorted.bam
+aligned.sorted.bam.bai
+idxstats.txt
+bam_summary_stats.txt
+per_chrom_all.txt
+per_chrom_mapq20.txt
+mapq_hist.txt
+combined_results.csv
+All_chromosomes_<tool>.pdf
+```
+
+---
+
+## Output interpretation
+
+The most important output for the thesis is the chromosome-level mapping summary.
+
+The pipeline tracks how many simulated reads map to the expected chromosome and how this changes depending on:
+
+- reference genome type,
+- read length,
+- chromosome arm,
+- aligner,
+- mapping quality threshold.
+
+These results are used to compare the behavior of `minimap2` and `winnowmap`, especially in difficult or repetitive chromosome regions.
+
+---
 
 ## Dependencies
 
-The pipeline requires Snakemake and the tools used by the selected workflow rules.
-
-Common dependencies include:
+The pipeline uses:
 
 ```text
-snakemake
+PBS/qsub
 samtools
+wgsim
 minimap2
 winnowmap
-seqkit
+mamba or conda
+Python 3
+R
+tidyverse
+rsync
 ```
 
-Some dependencies may only be required for specific rules or aligner choices.
+The exact environment depends on the HPC cluster configuration.
+
+---
 
 ## Notes
 
-- Make sure the reference FASTA files are correctly named and placed in `alignment/dataset/`.
-- Check the configuration file before each run.
-- Use a dry run with `-n` before launching large jobs.
-- If running on a cluster, adapt the Snakemake command to the local cluster environment.
+- Jobs must be submitted from the `alignment/` folder.
+- The scripts use `$PBS_O_WORKDIR` to locate the working directory.
+- Temporary computation is performed in `$SCRATCHDIR`.
+- Large SAM/BAM files should not be committed to Git.
+- The selected read lengths are defined inside `alignment_job.pbs`.
+- The number of simulated reads is defined inside `alignment_tools.sh`.

@@ -1,127 +1,242 @@
 # Basecalling Pipeline
 
-This folder contains the basecalling workflow for processing raw nanopore sequencing data into basecalled read files.
+This folder contains the Oxford Nanopore basecalling and telomere length estimation workflow.
 
-The workflow is designed to organize raw input data, run basecalling, and prepare output files for downstream analysis such as alignment, quality control, or assembly.
+The pipeline is designed for execution on a PBS-based HPC cluster with GPU support.
+
+---
 
 ## Purpose
 
-The basecalling pipeline converts raw nanopore signal data into nucleotide sequences. It provides a reproducible workflow for generating FASTQ files from raw sequencing output.
+The goal of this pipeline is to compare different Oxford Nanopore basecalling configurations and evaluate their influence on telomere length estimation.
 
-The resulting reads can be used as input for other workflows in this repository, including the alignment pipeline.
+The workflow processes raw nanopore signal data, generates long reads, estimates telomere lengths, and creates summary plots for comparison between basecallers, versions, models, and telomere detection tools.
 
-## Required input files
+---
 
-Place raw sequencing input data in:
+## Supported basecallers
+
+| Basecaller | Input format | Description |
+|---|---|---|
+| Dorado | POD5 | Current Oxford Nanopore basecaller |
+| Guppy | FAST5 | Older Oxford Nanopore basecaller |
+
+---
+
+## Supported telomere detection tools
+
+| Tool | Description |
+|---|---|
+| NCRF | Detects telomeric repeat regions in reads |
+| TeloBP | Estimates telomere lengths from long-read sequencing data |
+
+---
+
+## Pipeline overview
+
+```text
+POD5 / FAST5 input data
+    ↓
+Basecalling with Dorado or Guppy
+    ↓
+FASTQ reads
+    ↓
+FASTQ to FASTA conversion
+    ↓
+Telomere detection using NCRF and/or TeloBP
+    ↓
+telomere_lengths.tsv
+    ↓
+Histograms and violin plots
+```
+
+---
+
+## Input files
+
+Input files must be placed in:
 
 ```text
 basecall/dataset/
 ```
 
-Depending on the sequencing platform and basecaller configuration, input files may include:
+Expected structure:
 
 ```text
-*.pod5
-*.fast5
+basecall/dataset/
+├── Subset.pod5
+└── fast5_subset/
 ```
 
-Use the input format expected by the selected basecalling tool.
-
-## Main workflow
-
-The main Snakefile is:
+Dorado uses:
 
 ```text
-basecall/Snakefile
+Subset.pod5
 ```
 
-The workflow generally performs the following steps:
-
-1. Reads raw nanopore signal files from the dataset folder.
-2. Runs the selected basecaller.
-3. Produces basecalled reads in FASTQ format.
-4. Optionally compresses or organizes output files.
-5. Stores logs and benchmark information for reproducibility.
-
-## Configuration
-
-Pipeline settings are defined in the Snakemake configuration file, usually:
+Guppy uses:
 
 ```text
-basecall/config.yaml
+fast5_subset/
 ```
 
-Typical configurable values include:
+Large raw sequencing files should not be committed to Git.
 
-| Parameter | Description |
+---
+
+## Main scripts
+
+| Script | Purpose |
 |---|---|
-| `input_dir` | Directory containing raw signal files |
-| `output_dir` | Directory for basecalled output files |
-| `model` | Basecalling model to use |
-| `device` | CPU or GPU device setting |
-| `threads` | Number of CPU threads |
-| `basecaller` | Basecalling tool used by the workflow |
+| `basecall_pipeline.pbs` | Main PBS job. Runs Dorado or Guppy and then performs telomere length estimation. |
+| `extract.py` | Parses NCRF output and creates a standardized `telomere_lengths.tsv` file. |
+| `telomere_graphs.R` | Creates a telomere length histogram for a single run. |
+| `visualise_results.pbs` | Runs visualization scripts for collected basecalling results. |
+| `basecall_histograms.R` | Creates grouped histogram plots from multiple runs. |
+| `basecall_comparison.R` | Creates violin plots comparing basecallers, versions, models, and telomere detection tools. |
 
-Update the configuration file before running the workflow.
+---
 
-## Running the pipeline
+## Running basecalling
 
-From the repository root, run:
+Submit the job from the `basecall/` directory.
 
-```bash
-snakemake -s basecall/Snakefile --cores 8
-```
-
-To perform a dry run first:
+Example Dorado run:
 
 ```bash
-snakemake -s basecall/Snakefile --cores 8 -n
+cd basecall
+qsub -v BASECALLER=dorado,VERSION=1.4.0,MODEL=dna_r10.4.1_e8.2_400bps_sup@v5.2.0,TELO_TOOL=both basecall_pipeline.pbs
 ```
 
-To print the commands without executing them:
+Example Guppy run:
 
 ```bash
-snakemake -s basecall/Snakefile --cores 8 -n -p
+cd basecall
+qsub -v BASECALLER=guppy,VERSION=6.5.7,MODEL=dna_r10.4.1_e8.2_400bps_sup.cfg,TELO_TOOL=both basecall_pipeline.pbs
 ```
 
-## Output
+Available variables:
 
-The pipeline produces basecalled read files and supporting output, usually under:
+| Variable | Example | Description |
+|---|---|---|
+| `BASECALLER` | `dorado`, `guppy` | Basecaller to run |
+| `VERSION` | `1.4.0`, `6.5.7` | Basecaller version |
+| `MODEL` | Dorado model name or Guppy config file | Basecalling model/configuration |
+| `TELO_TOOL` | `ncrf`, `telobp`, `both` | Telomere detection tool |
+
+If variables are not provided, default values defined inside `basecall_pipeline.pbs` are used.
+
+---
+
+## Generating comparison plots
+
+After multiple basecalling runs are finished, run:
+
+```bash
+cd basecall
+qsub visualise_results.pbs
+```
+
+This creates summary histograms and violin plots from collected `telomere_lengths.tsv` files.
+
+---
+
+## Output files
+
+Each basecalling run creates a separate output directory under:
 
 ```text
 basecall/results/
-basecall/logs/
-basecall/benchmark/
 ```
 
-Expected read output may include:
+Example output directory:
 
 ```text
-*.fastq
-*.fastq.gz
+basecall/results/dorado_v1.4.0_dna_r10_4_1_e8_2_400bps_sup_v5_2_0/
 ```
 
-These files can be used for downstream workflows such as read alignment or quality assessment.
+Important output files include:
+
+```text
+reads.fastq
+reads.fasta
+ncrf/telomere_lengths.tsv
+ncrf/*.ncrf
+ncrf/*.pdf
+telobp/telomere_lengths.tsv
+telobp/*.csv
+telobp/*.pdf
+```
+
+Comparison outputs are written to:
+
+```text
+basecall/results/histograms/
+```
+
+Important comparison files include:
+
+```text
+histogram_summary_stats.tsv
+summary_stats.tsv
+compare_basecaller_combined.pdf
+compare_basecaller_combined_log.pdf
+compare_versions_sup_telobp_violin.pdf
+compare_versions_sup_ncrf_violin.pdf
+```
+
+---
+
+## Output interpretation
+
+The main output of the pipeline is a standardized table of estimated telomere lengths:
+
+```text
+telomere_lengths.tsv
+```
+
+This file is used to compare telomere length distributions between:
+
+- basecallers,
+- basecaller versions,
+- basecalling models,
+- telomere detection tools.
+
+The generated histograms and violin plots are used to visualize differences in telomere length estimates between individual pipeline configurations.
+
+---
 
 ## Dependencies
 
-The pipeline requires Snakemake and the selected basecalling software.
-
-Common dependencies may include:
+The pipeline uses:
 
 ```text
-snakemake
-dorado
-guppy
+PBS/qsub
+Dorado
+Guppy
 samtools
+Python 3
+R
+ggplot2
+dplyr
+stringr
+purrr
+readr
+patchwork
+NCRF
+TeloBP
+CUDA-compatible GPU
 ```
 
-The exact dependencies depend on which basecaller is configured in the workflow.
+The exact environment depends on the HPC cluster configuration.
+
+---
 
 ## Notes
 
-- Make sure the raw input files are placed in `basecall/dataset/`.
-- Check that the selected basecalling model matches the sequencing chemistry and flow cell.
-- GPU basecalling may require a compatible CUDA environment.
-- Use a dry run with `-n` before launching large jobs.
-- If running on a cluster, adapt the Snakemake command to the local cluster environment.
+- Jobs must be submitted from the `basecall/` folder.
+- Dorado expects POD5 input.
+- Guppy expects FAST5 input.
+- GPU basecalling requires a compatible CUDA environment.
+- Temporary computation is performed in `$SCRATCHDIR`.
+- Large FASTQ, BAM, POD5, FAST5, and result files should not be committed to Git.
