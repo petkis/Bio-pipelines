@@ -1,6 +1,4 @@
 
----
-
 ## `alignment/README.md`
 
 ```markdown
