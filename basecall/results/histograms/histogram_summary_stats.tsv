@@ -1,0 +1,39 @@
+tool	basecaller	version	model_family	n	median
+NCRF	dorado	0.8.3	HAC	3716	885.5
+NCRF	dorado	0.9.1 (2024 early)	HAC	3716	900
+NCRF	dorado	0.9.1 (2024 early)	SUP	3146	1826
+NCRF	dorado	0.9.6 (2024 late)	HAC	3400	1294
+NCRF	dorado	0.9.6 (2024 late)	SUP	3180	1776
+NCRF	dorado	1.0.0 (2025-05)	HAC	3264	1631.5
+NCRF	dorado	1.0.0 (2025-05)	SUP	3162	1821
+NCRF	dorado	1.2.0 (2025-10)	HAC	3244	1640
+NCRF	dorado	1.2.0 (2025-10)	SUP	3166	1806
+NCRF	dorado	1.3.0 (2025-11)	HAC	3246	1638
+NCRF	dorado	1.3.0 (2025-11)	SUP	3166	1806
+NCRF	dorado	1.4.0 (2026-02)	HAC	3254	1636
+NCRF	dorado	1.4.0 (2026-02)	SUP	3162	1821
+NCRF	guppy	6.0.6	HAC	2604	189.5
+NCRF	guppy	6.0.6	SUP	3062	292
+NCRF	guppy	6.3.8	HAC	4002	211
+NCRF	guppy	6.3.8	SUP	5168	251
+NCRF	guppy	6.5.7 (2023)	HAC	3494	1227
+NCRF	guppy	6.5.7 (2023)	SUP	3210	1647
+TeloBP	dorado	0.8.3	HAC	1145	2622
+TeloBP	dorado	0.9.1 (2024 early)	HAC	1145	2610
+TeloBP	dorado	0.9.1 (2024 early)	SUP	1151	2688
+TeloBP	dorado	0.9.6 (2024 late)	HAC	1130	2430
+TeloBP	dorado	0.9.6 (2024 late)	SUP	1147	2706
+TeloBP	dorado	1.0.0 (2025-05)	HAC	1148	2661
+TeloBP	dorado	1.0.0 (2025-05)	SUP	1146	2712
+TeloBP	dorado	1.2.0 (2025-10)	HAC	1151	2658
+TeloBP	dorado	1.2.0 (2025-10)	SUP	1145	2712
+TeloBP	dorado	1.3.0 (2025-11)	HAC	1152	2652
+TeloBP	dorado	1.3.0 (2025-11)	SUP	1145	2712
+TeloBP	dorado	1.4.0 (2026-02)	HAC	1152	2658
+TeloBP	dorado	1.4.0 (2026-02)	SUP	1146	2712
+TeloBP	guppy	6.0.6	HAC	892	120
+TeloBP	guppy	6.0.6	SUP	970	174
+TeloBP	guppy	6.3.8	HAC	999	132
+TeloBP	guppy	6.3.8	SUP	1128	234
+TeloBP	guppy	6.5.7 (2023)	HAC	1143	2574
+TeloBP	guppy	6.5.7 (2023)	SUP	1126	2712
