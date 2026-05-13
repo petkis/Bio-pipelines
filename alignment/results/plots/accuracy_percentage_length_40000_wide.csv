@@ -1,5 +1,5 @@
 "chrom","minimap2_Masked_Masked","minimap2_Masked_NoTelo","minimap2_Masked_Telo","minimap2_NoTelo_Masked","minimap2_NoTelo_NoTelo","minimap2_NoTelo_Telo","minimap2_Telo_Masked","minimap2_Telo_NoTelo","minimap2_Telo_Telo","winnowmap_Masked_Masked","winnowmap_Masked_NoTelo","winnowmap_Masked_Telo","winnowmap_NoTelo_Masked","winnowmap_NoTelo_NoTelo","winnowmap_NoTelo_Telo","winnowmap_Telo_Masked","winnowmap_Telo_NoTelo","winnowmap_Telo_Telo"
-"chr1",0,0,0,0,0,0,0,0,0,100,100,100,100,100,100,100,100,100
+"chr1",100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100
 "chr10",100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100
 "chr11",100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100
 "chr12",100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100
