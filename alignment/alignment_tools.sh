@@ -125,7 +125,7 @@ for path in "${CHROMFA_DIR}"/*.fa; do
         "$TOOL" -t "$THREADS" -a -x "$MINIMAP_PRESET" \
             -W "$REP_K15" \
             --split-prefix "${chrom}_${subtype}_split" \
-            "$REF_IDX" "$fq" > "$sam"
+            "$REF_FA" "$fq" > "$sam"
     else
         "$TOOL" -t "$THREADS" -a -x "$MINIMAP_PRESET" \
             --split-prefix "${chrom}_${subtype}_split" \
