@@ -5,6 +5,10 @@
 #PBS -j oe
 #PBS -o basecall_pipeline.log
 
+# Run a basecalling and telomere detection pipeline on a POD5/FAST5 subset.
+# The script basecalls reads with Dorado or Guppy, converts reads to FASTQ/FASTA,
+# runs NCRF and/or TeloBP, creates telomere length plots, and saves outputs.
+
 set -euo pipefail
 
 LOGSDIR="$PBS_O_WORKDIR/job_logs"
@@ -12,6 +16,7 @@ mkdir -p "$LOGSDIR"
 
 exec >"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.log" 2>&1
 
+# Clean scratch automatically when the job exits or is terminated.
 trap 'clean_scratch' EXIT TERM
 
 echo "START $(date)"
@@ -24,20 +29,23 @@ module purge
 module add metabase/1
 module add samtools/1.14-gcc
 
-# ============================
-# SETTINGS
-# ============================
-
+# Set basecaller, version, model, and telomere detection tool.
+# These can be overwritten during qsub using -v.
 BASECALLER="${BASECALLER:-dorado}"
 VERSION="${VERSION:-1.0.0}"
 MODEL="${MODEL:-dna_r10.4.1_e8.2_400bps_sup@v5.2.0}"
 TELO_TOOL="${TELO_TOOL:-both}"
 
+# Convert model name into a filename-safe tag.
 MODEL_TAG=$(echo $MODEL | tr '@' '_' | tr '.' '_')
 
+# Define input files and output location.
 INPUT_POD5="$PBS_O_WORKDIR/dataset/Subset.pod5"
 FAST5_SOURCE="$PBS_O_WORKDIR/dataset/fast5_subset"
+
 OUT_BASE="$PBS_O_WORKDIR/results"
+
+NCRF_BIN="/storage/brno2/home/xpetkov/genomes/basecall/NoiseCancellingRepeatFinder/NCRF"
 
 OUT_DIR="${OUT_BASE}/${BASECALLER}_v${VERSION}_${MODEL_TAG}"
 mkdir -p "$OUT_DIR"
@@ -45,12 +53,25 @@ mkdir -p "$OUT_DIR"
 cd "$SCRATCHDIR"
 cp "$INPUT_POD5" input.pod5
 
+# Check basecaller input
+if [[ "$BASECALLER" != "dorado" && "$BASECALLER" != "guppy" ]]; then
+    echo "ERROR: BASECALLER must be dorado or guppy" >&2
+    exit 1
+fi
+
+# Check tool input
+if [[ "$TELO_TOOL" != "ncrf" && "$TELO_TOOL" != "telobp" && "$TELO_TOOL" != "both" ]]; then
+    echo "ERROR: TELO_TOOL must be ncrf, telobp, or both" >&2
+    exit 1
+fi
+
 # ============================
 # BASECALLING
 # ============================
 
 echo "Basecalling..."
 
+# Run Dorado basecalling if BASECALLER=dorado.
 if [ "$BASECALLER" = "dorado" ]; then
 
     echo "Installing Dorado $VERSION..."
@@ -61,9 +82,7 @@ if [ "$BASECALLER" = "dorado" ]; then
     tar -xzf dorado.tar.gz
     DORADO_BIN="$SCRATCHDIR/dorado-${VERSION}-linux-x64/bin/dorado"
 
-    # ----------------------------
-    # CHECK: binary exists
-    # ----------------------------
+    # Check that the Dorado binary exists and is executable.
     if [ ! -x "$DORADO_BIN" ]; then
         echo "ERROR: Dorado binary not found"
         exit 1
@@ -71,65 +90,56 @@ if [ "$BASECALLER" = "dorado" ]; then
 
     echo "Dorado OK"
 
-    # ----------------------------
-    # MODEL HANDLING
-    # ----------------------------
+    # Download the selected Dorado model.
     echo "Using model: $MODEL"
 
     echo "Downloading model..."
     "$DORADO_BIN" download --model "$MODEL" 2>&1 | tee model_download.log
 
+    # Stop if the model download failed.
     if [ $? -ne 0 ]; then
         echo "ERROR: Model download failed -> incompatible model/version"
         exit 1
     fi
 
-    # ----------------------------
-    # GPU INFO (debug)
-    # ----------------------------
+    # Print GPU information for debugging.
     echo "GPU status:"
     nvidia-smi || true
 
-    # ----------------------------
-    # BASECALLING
-    # ----------------------------
+    # Run Dorado basecalling and save BAM output.
     echo "Running Dorado basecaller..."
 
     "$DORADO_BIN" basecaller "$MODEL" input.pod5 \
         --device cuda:all > basecalls.bam
-    # Dorado outputs BAM to stdout by default :contentReference[oaicite:0]{index=0}
 
-    # ----------------------------
-    # CHECK OUTPUT
-    # ----------------------------
+    # Check that Dorado produced a non-empty BAM file.
     if [ ! -s basecalls.bam ]; then
         echo "ERROR: basecalling failed (empty BAM)"
         exit 1
     fi
 
-    # ----------------------------
-    # CONVERT TO FASTQ
-    # ----------------------------
+    # Convert Dorado BAM output to FASTQ.
     echo "Converting BAM into FASTQ"
 
     samtools fastq basecalls.bam > reads.fastq
 
+    # Check that FASTQ conversion worked.
     if [ ! -s reads.fastq ]; then
         echo "ERROR: FASTQ conversion failed"
         exit 1
     fi
 
+# Run Guppy basecalling if BASECALLER=guppy.
 elif [ "$BASECALLER" = "guppy" ]; then
 
+    # Download and unpack the selected Guppy version.
     echo "Downloading Guppy ${VERSION}..."
     curl -fL -o guppy.tar.gz \
     https://mirror.oxfordnanoportal.com/software/analysis/ont-guppy_${VERSION}_linux64.tar.gz
 
     tar -xzf guppy.tar.gz
 
-    # =========================
-    # FIND INSTALL PATH
-    # =========================
+    # Find the unpacked Guppy directory.
     GUPPY_DIR=$(find . -maxdepth 2 -type d -name "ont-guppy*" | head -n 1)
 
     if [ -z "$GUPPY_DIR" ]; then
@@ -137,6 +147,7 @@ elif [ "$BASECALLER" = "guppy" ]; then
         exit 1
     fi
 
+    # Define Guppy binary and config directory.
     GUPPY_BIN="$GUPPY_DIR/bin/guppy_basecaller"
     CONFIG_DIR="$GUPPY_DIR/data"
 
@@ -144,14 +155,13 @@ elif [ "$BASECALLER" = "guppy" ]; then
     echo "Binary: $GUPPY_BIN"
     echo "Config dir: $CONFIG_DIR"
 
-    # =========================
-    # ROBUSTNESS CHECK
-    # =========================
+    # Check that the Guppy binary exists and is executable.
     if [ ! -x "$GUPPY_BIN" ]; then
         echo "ERROR: guppy_basecaller not found or not executable"
         exit 1
     fi
 
+    # Check that the selected Guppy config exists.
     if [ ! -f "$CONFIG_DIR/$MODEL" ]; then
         echo "ERROR: Config $MODEL not found!"
         echo "Available configs:"
@@ -161,15 +171,10 @@ elif [ "$BASECALLER" = "guppy" ]; then
 
     echo "Using config: $CONFIG_DIR/$MODEL"
 
-    # =========================
-    # INPUT PREP
-    # =========================
     cp -r "$FAST5_SOURCE" fast5_input
     mkdir guppy_out
 
-    # =========================
-    # BASECALLING
-    # =========================
+    # Run Guppy basecalling.
     "$GUPPY_BIN" \
         -i fast5_input \
         -s guppy_out \
@@ -177,21 +182,18 @@ elif [ "$BASECALLER" = "guppy" ]; then
         -x auto \
         --disable_qscore_filtering
 
-    # =========================
-    # OUTPUT CHECK
-    # =========================
+    # Check that Guppy produced FASTQ files.
     if ! find guppy_out -name "*.fastq" | grep -q .; then
         echo "ERROR: No FASTQ files produced!"
         exit 1
     fi
 
-    # =========================
-    # MERGE OUTPUT
-    # =========================
+    # Merge all Guppy FASTQ files into one file.
     find guppy_out -name "*.fastq" -exec cat {} + > reads.fastq
 
 fi
 
+# Save final FASTQ reads to the output directory.
 cp reads.fastq "$OUT_DIR/reads.fastq"
 
 awk 'NR%4==1{print ">"substr($0,2)} NR%4==2{print}' reads.fastq > reads.fasta
@@ -203,15 +205,18 @@ export BASECALLER VERSION MODEL TELO_TOOL
 # NCRF
 # ============================
 
+# Run NCRF if requested.
 if [ "$TELO_TOOL" = "ncrf" ] || [ "$TELO_TOOL" = "both" ]; then
 
+    # Prepare NCRF working directory and copy NCRF binary.
     echo "Running NCRF..."
     mkdir ncrf
-    cp /storage/brno2/home/xpetkov/genomes/basecall/NoiseCancellingRepeatFinder/NCRF ncrf/
+    cp "$NCRF_BIN" ncrf/
     chmod +x ncrf/NCRF
 
     cd ncrf
 
+    # Search for telomeric repeats on both strands.
     ./NCRF TTAGGG --maxnoise=20% --minlength=50 < ../reads.fasta > telo_G.ncrf
     ./NCRF CCCTAA --maxnoise=20% --minlength=50 < ../reads.fasta > telo_C.ncrf
 
@@ -222,7 +227,8 @@ if [ "$TELO_TOOL" = "ncrf" ] || [ "$TELO_TOOL" = "both" ]; then
     module add metabase/1
     module add r-ggplot2
 
-    cp /storage/brno2/home/xpetkov/genomes/basecall/telomere_graphs.R .
+    # Copy and run the plotting script.
+    cp "$PBS_O_WORKDIR/telomere_graphs.R" .
 
     export GRAPH_TOOL="ncrf"
     Rscript telomere_graphs.R
@@ -241,7 +247,9 @@ fi
 # TELOBP
 # ============================
 
+# Run TeloBP if requested.
 if [ "$TELO_TOOL" = "telobp" ] || [ "$TELO_TOOL" = "both" ]; then
+    # Load Python module for TeloBP.
     module purge
     module add metabase/1
     module add python/3.11.11-gcc-10.2.1-555dlyc
@@ -250,6 +258,7 @@ if [ "$TELO_TOOL" = "telobp" ] || [ "$TELO_TOOL" = "both" ]; then
     mkdir telobp
     cd telobp
 
+    # Create Python virtual environment and install TeloBP.
     python3 -m venv env
     source env/bin/activate
 
@@ -260,6 +269,7 @@ if [ "$TELO_TOOL" = "telobp" ] || [ "$TELO_TOOL" = "both" ]; then
 
     python3 TeloBP/Scripts/teloBPCmd.py ../reads.fastq telobp_out --fileMode
 
+    # Convert TeloBP CSV output into a common telomere_lengths.tsv format.
     echo -e "read_id\tlength\tstrand" > telomere_lengths.tsv
 
     tail -n +2 telobp_out/*.csv | \
@@ -269,7 +279,8 @@ if [ "$TELO_TOOL" = "telobp" ] || [ "$TELO_TOOL" = "both" ]; then
     module add metabase/1
     module add r-ggplot2
 
-    cp /storage/brno2/home/xpetkov/genomes/basecall/telomere_graphs.R .
+    # Copy and run the plotting script.
+    cp "$PBS_O_WORKDIR/telomere_graphs.R" .
 
     export GRAPH_TOOL="telobp"
     Rscript telomere_graphs.R
