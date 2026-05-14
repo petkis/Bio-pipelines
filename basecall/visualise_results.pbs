@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# Run R scripts that compare telomere length results from different basecallers.
+# The job creates histogram and comparison plots, then copies the PDF/TSV outputs
+# back to the results directory.
+
 #PBS -N telo_compare
 #PBS -l select=1:ncpus=2:mem=16gb:scratch_local=50gb
 #PBS -l walltime=01:00:00
@@ -12,6 +17,7 @@ mkdir -p "$LOGSDIR"
 
 exec >"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.log" 2>&1
 
+# Clean scratch automatically when the job exits or is terminated.
 trap 'clean_scratch' EXIT TERM
 
 echo "Job started on $(hostname) at $(date)"
@@ -20,9 +26,11 @@ module purge
 module add metabase/1
 module add r/4.4.0-gcc-10.2.1-oxdi5pz
 
+# Set user R library path for installed R packages.
 export R_LIBS_USER="/storage/brno12-cerit/home/xpetkov/Rlibs/4.4"
 mkdir -p $R_LIBS_USER
 
+# Define scratch, input, and output directories.
 SCRATCH=$SCRATCHDIR
 INPUT_DIR="$PBS_O_WORKDIR/results"
 HIST_DIR="$PBS_O_WORKDIR/results/histograms"
@@ -32,14 +40,17 @@ mkdir -p "$HIST_DIR"
 mkdir -p "$COMPARE_DIR"
 cd $SCRATCH
 
+# Copy R scripts to scratch before running them.
 echo "Copying R script..."
 cp "$PBS_O_WORKDIR"/basecall_histograms.R .
 cp "$PBS_O_WORKDIR"/basecall_comparison.R .
 
+# Run histogram generation and basecaller comparison scripts.
 echo "Running R..."
 Rscript basecall_histograms.R "$INPUT_DIR"
 Rscript basecall_comparison.R "$INPUT_DIR"
 
+# Copy generated plots and summary tables back to the results directory.
 echo "Copying results..."
 cp *.pdf "$COMPARE_DIR/" 2>/dev/null || true
 cp -r histograms/* "$HIST_DIR"

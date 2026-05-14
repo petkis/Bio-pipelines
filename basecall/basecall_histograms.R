@@ -1,21 +1,25 @@
 #!/usr/bin/env Rscript
 
-# =========================
-# AUTO-INSTALL DEPENDENCIES
-# =========================
+# Create histogram PDFs for telomere length distributions.
+# The script searches for telomere_lengths.tsv files, parses basecaller/version/model/tool
+# information from folder names, creates grouped histogram PDFs, and saves summary statistics.
+
+# Install required packages if they are missing.
 required_packages <- c("ggplot2", "dplyr", "stringr", "purrr", "readr", "patchwork")
 new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages, repos='http://cran.us.r-project.org')
 
+# Load packages without printing startup messages.
 suppressPackageStartupMessages({
   library(ggplot2)
   library(dplyr)
   library(stringr)
   library(purrr)
   library(readr)
-  library(patchwork) # Required for stitching independent plots
+  library(patchwork)
 })
 
+# Read input directory from the command line.
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) < 1) {
@@ -24,10 +28,7 @@ if (length(args) < 1) {
 
 base_dir <- args[1]
 
-# =========================
-# VERSION MAP
-# =========================
-
+# Map raw basecaller versions to readable labels used in plot titles.
 version_map <- c(
   "0.9.1" = "0.9.1 (2024 early)",
   "0.9.6" = "0.9.6 (2024 late)",
@@ -38,10 +39,7 @@ version_map <- c(
   "6.5.7" = "6.5.7 (2023)"
 )
 
-# =========================
-# HELPERS
-# =========================
-
+# Classify the model into SUP or HAC based on the model name.
 model_family_from_model <- function(model) {
   case_when(
     str_detect(str_to_lower(model), "sup") ~ "SUP",
@@ -50,15 +48,16 @@ model_family_from_model <- function(model) {
   )
 }
 
-# =========================
-# LOAD AND PARSE
-# =========================
-
+# Find all telomere length files in the input directory.
 files <- list.files(base_dir, pattern = "telomere_lengths.tsv$", recursive = TRUE, full.names = TRUE)
 if (length(files) == 0) stop("No files found.")
 
+# Read one telomere_lengths.tsv file and add metadata parsed from its path.
 parse_file <- function(f) {
+  # Load the file safely and skip it if reading fails.
   df <- tryCatch({ read_tsv(f, show_col_types = FALSE) }, error = function(e) return(NULL))
+
+  # Skip files that could not be read or do not contain a length column.
   if (is.null(df) || !"length" %in% names(df)) return(NULL)
 
   df$length <- suppressWarnings(as.numeric(df$length))
@@ -90,17 +89,15 @@ parse_file <- function(f) {
   return(df)
 }
 
+# Load all files and keep only Dorado/Guppy SUP and HAC data.
 df_all <- map_dfr(files, parse_file) %>%
   filter(basecaller %in% c("dorado", "guppy"), model_family %in% c("SUP", "HAC"))
 
-# Ensure chronological order
+# Keep display labels in the order they appear in the loaded data.
 ordered_levels <- unique(df_all$display_label)
 df_all$display_label <- factor(df_all$display_label, levels = ordered_levels)
 
-# =========================
-# PLOTTING LOGIC
-# =========================
-
+# Create one histogram for one version/basecaller/tool group.
 create_individual_plot <- function(sub_data, label_name) {
   ggplot(sub_data, aes(x = length)) +
     geom_histogram(bins = 80, color = "black", fill = "steelblue") +
@@ -120,14 +117,11 @@ create_individual_plot <- function(sub_data, label_name) {
     )
 }
 
-# =========================
-# GENERATE OUTPUTS
-# =========================
-
+# Create output folder for histogram PDFs.
 out_root <- "histograms"
 dir.create(out_root, showWarnings = FALSE, recursive = TRUE)
 
-# Group by Tool and Family for separate PDFs
+# Create separate PDFs for each tool and model family combination.
 groupings <- df_all %>% distinct(tool, model_family)
 
 for (i in 1:nrow(groupings)) {
@@ -143,9 +137,7 @@ for (i in 1:nrow(groupings)) {
     create_individual_plot(filter(plot_data, display_label == lbl), lbl)
   })
 
-  # Use patchwork to combine plots
-  # ncol = 2 forces 2 columns
-  # Every plot keeps its own axis labels because they are separate ggplot objects
+   # Combine individual histograms into one multi-panel PDF.
   combined_plot <- wrap_plots(plot_list, ncol = 2) +
     plot_annotation(
       title = paste(curr_tool, "Analysis -", curr_fam, "Models"),
@@ -163,10 +155,7 @@ for (i in 1:nrow(groupings)) {
   ggsave(out_path, combined_plot, width = 12, height = max(5, n_rows * 4.5), units = "in", dpi = 300)
 }
 
-# =========================
-# SUMMARY
-# =========================
-
+# Save basic summary statistics for each tool/basecaller/version/model family group.
 summary_stats <- df_all %>%
   group_by(tool, basecaller, version, model_family) %>%
   summarise(n = n(), median = median(length), .groups = "drop")

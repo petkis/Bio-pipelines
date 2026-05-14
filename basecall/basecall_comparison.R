@@ -6,13 +6,20 @@ library(stringr)
 library(purrr)
 library(readr)
 
+# Compare telomere length distributions between basecaller versions,
+# models, and telomere detection tools.
+# The script loads all telomere_lengths.tsv files from the selected directory,
+# extracts metadata from folder names, creates violin plots, and saves a summary table.
+
+# Read input directory from the command line.
 args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 1) {
+  stop("Usage: Rscript script.R <base_dir>")
+}
 base_dir <- args[1]
 
-# =========================
-# VERSION MAPS
-# =========================
 
+# Map raw basecaller versions to longer labels used in the output.
 version_map <- c(
   "0.9.1" = "0.9.1 (2024 early)",
   "0.9.6" = "0.9.6 (2024 late)",
@@ -42,10 +49,7 @@ version_short_map <- c(
 version_order <- unname(version_map)
 version_short_order <- unname(version_short_map)
 
-# =========================
-# LOAD FILES
-# =========================
-
+# Find all telomere length files inside the selected directory.
 files <- list.files(
   base_dir,
   pattern = "telomere_lengths.tsv",
@@ -53,12 +57,10 @@ files <- list.files(
   full.names = TRUE
 )
 
-# =========================
-# PARSE FUNCTION
-# =========================
-
+# Parse one telomere_lengths.tsv file and add metadata from its path.
 parse_file <- function(f) {
 
+  # Read the file safely; skip it if reading fails.
   df <- tryCatch({
     read_tsv(f, show_col_types = FALSE)
   }, error = function(e) return(NULL))
@@ -104,18 +106,12 @@ parse_file <- function(f) {
   return(df)
 }
 
-# =========================
-# MERGE
-# =========================
-
+# Load and merge all telomere length files.
 df_all <- map_dfr(files, parse_file)
 
 if (nrow(df_all) == 0) stop("No data loaded")
 
-# =========================
-# ADD SHORT MODEL NAME
-# =========================
-
+# Create short model labels: fast, hac, or sup.
 df_all <- df_all %>%
   mutate(
     model_short = case_when(
@@ -126,10 +122,7 @@ df_all <- df_all %>%
     )
   )
 
-# =========================
-# FACTOR ORDERING
-# =========================
-
+# Set factor order for consistent plotting.
 df_all <- df_all %>%
   mutate(
     basecaller = factor(basecaller, levels = c("dorado", "guppy")),
@@ -139,10 +132,7 @@ df_all <- df_all %>%
     model_short = factor(model_short, levels = c("fast", "hac", "sup"))
   )
 
-# =========================
-# ADD GROUP COLUMNS
-# =========================
-
+# Create combined grouping columns used in comparison plots.
 df_all <- df_all %>%
   mutate(
     group = case_when(
@@ -154,10 +144,7 @@ df_all <- df_all %>%
     group_model = paste(basecaller, tool, model_short, sep = " - ")
   )
 
-# =========================
-# PLOTTING FUNCTIONS
-# =========================
-
+# Create a violin plot with a linear y-axis.
 plot_violin <- function(
     data,
     title,
@@ -168,14 +155,16 @@ plot_violin <- function(
     y_max = NULL
 ) {
 
+  # Skip empty datasets.
   if (nrow(data) == 0) {
     warning(paste("Skipping plot because no data:", filename))
     return(NULL)
   }
 
-  # For version plots, use the shorter version labels.
+  # Use short version labels for version comparison plots.
   x_var <- if (fill_var == "version") "version_short" else fill_var
 
+  # Create violin and boxplot overlay.
   p <- ggplot(data, aes(x = .data[[x_var]], y = length, fill = basecaller)) +
     geom_violin(
       trim = TRUE,
@@ -245,6 +234,7 @@ plot_violin <- function(
   )
 }
 
+# Create a violin plot with a log10 y-axis.
 plot_violin_log <- function(
     data,
     title,
@@ -254,12 +244,13 @@ plot_violin_log <- function(
     force_height = 7.5
 ) {
 
+  # Skip empty datasets.
   if (nrow(data) == 0) {
     warning(paste("Skipping plot because no data:", filename))
     return(NULL)
   }
 
-  # For version plots, use the shorter version labels.
+  # Use short version labels for version comparison plots.
   x_var <- if (fill_var == "version") "version_short" else fill_var
 
   p <- ggplot(data, aes(x = .data[[x_var]], y = length, fill = basecaller)) +
@@ -326,10 +317,7 @@ plot_violin_log <- function(
   )
 }
 
-# =========================
-# 1. SUP MODELS -> VERSION COMPARISON
-# =========================
-
+# Compare SUP models across basecaller versions for TeloBP and NCRF.
 df_sup_telobp <- df_all %>%
   filter(str_detect(model, "sup"), tool == "telobp")
 
@@ -372,10 +360,7 @@ plot_violin_log(
   7.5
 )
 
-# =========================
-# 1b. HAC MODELS -> VERSION COMPARISON
-# =========================
-
+# Compare HAC models across basecaller versions for TeloBP and NCRF.
 df_hac_telobp <- df_all %>%
   filter(str_detect(model, "hac"), tool == "telobp")
 
@@ -418,10 +403,7 @@ plot_violin_log(
   7.5
 )
 
-# =========================
-# 2. NCRF vs TELOBP for GUPPY
-# =========================
-
+# Compare NCRF and TeloBP for Guppy 6.5.7 SUP data.
 df_g65 <- df_all %>%
   filter(
     basecaller == "guppy",
@@ -443,10 +425,7 @@ plot_violin_log(
   "tool"
 )
 
-# =========================
-# 3. NCRF vs TELOBP for DORADO
-# =========================
-
+# Compare NCRF and TeloBP for Dorado 1.4.0 SUP data.
 df_d14 <- df_all %>%
   filter(
     basecaller == "dorado",
@@ -468,10 +447,7 @@ plot_violin_log(
   "tool"
 )
 
-# =========================
-# 4. DORADO MODEL COMPARISON
-# =========================
-
+# Compare Dorado 1.4.0 models separately for TeloBP, NCRF, and combined groups.
 df_d14_all <- df_all %>%
   filter(
     basecaller == "dorado",
@@ -520,10 +496,7 @@ plot_violin_log(
   "group_model"
 )
 
-# =========================
-# 5. BASECALLER COMPARISON
-# =========================
-
+# Compare Guppy 6.5.7 SUP against Dorado 1.4.0 SUP.
 df_compare <- df_all %>%
   filter(
     (basecaller == "guppy" & version == "6.5.7 (2023)") |
@@ -545,8 +518,5 @@ plot_violin_log(
   "group"
 )
 
-# =========================
-# SAVE DATA
-# =========================
-
+# Save the merged and annotated telomere length table.
 write_tsv(df_all, "summary_stats.tsv")
