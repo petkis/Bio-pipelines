@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N alignment_pipeline
-#PBS -l select=1:ncpus=20:mem=380gb:scratch_local=220gb
+#PBS -l select=1:ncpus=18:mem=300gb:scratch_local=220gb
 #PBS -l walltime=24:00:00
 #PBS -o latest_align.out
 #PBS -e latest_align.err
@@ -18,8 +18,8 @@ CHROMARM="${ARM:-p}"
 module purge
 module add samtools
 
-TOOL="${TOOL:-winnowmap}"
-CHROM="${CHROM:-chr21_PATERNAL}"
+TOOL="${TOOL:-minimap2}"
+CHROM="${CHROM:-chr13_PATERNAL}"
 LENGTHS=(10000 20000 30000 40000)
 
 TOOL="${TOOL,,}"

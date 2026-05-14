@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N genome_analysis_viz
-#PBS -l select=1:ncpus=1:mem=24gb:scratch_local=20gb
+#PBS -l select=1:ncpus=1:mem=32gb:scratch_local=50gb
 #PBS -l walltime=01:00:00
 #PBS -o visualization.out
 #PBS -e visualization.err
@@ -55,7 +55,9 @@ Rscript plot_results.R
 
 # 6. Copy results back
 echo "Cleaning up and copying results to $OUTPUT_DIR..."
+
 mkdir -p "$OUTPUT_DIR"
+
 cp combined_results.csv "$OUTPUT_DIR/"
 cp *.pdf "$OUTPUT_DIR/" || true
 

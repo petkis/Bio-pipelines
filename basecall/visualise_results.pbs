@@ -26,8 +26,10 @@ mkdir -p $R_LIBS_USER
 SCRATCH=$SCRATCHDIR
 INPUT_DIR="$PBS_O_WORKDIR/results"
 HIST_DIR="$PBS_O_WORKDIR/results/histograms"
+COMPARE_DIR="$PBS_O_WORKDIR/results/comparison_graphs"
 
 mkdir -p "$HIST_DIR"
+mkdir -p "$COMPARE_DIR"
 cd $SCRATCH
 
 echo "Copying R script..."
@@ -39,6 +41,7 @@ Rscript basecall_histograms.R "$INPUT_DIR"
 Rscript basecall_comparison.R "$INPUT_DIR"
 
 echo "Copying results..."
+cp *.pdf "$COMPARE_DIR/" 2>/dev/null || true
 cp -r histograms/* "$HIST_DIR"
 cp *.tsv "$HIST_DIR/" 2>/dev/null || true
 

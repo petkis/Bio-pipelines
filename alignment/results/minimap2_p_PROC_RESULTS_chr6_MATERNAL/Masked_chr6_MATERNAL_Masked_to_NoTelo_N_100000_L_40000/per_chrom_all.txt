@@ -1,0 +1,1 @@
+chr6_MATERNAL 100000

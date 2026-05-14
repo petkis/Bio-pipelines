@@ -24,15 +24,12 @@
 **/*.out
 **/*.err
 
-# ignore results by default
-**/results/*
-**/results/**
+# ignore everything inside alignment/results by default
+alignment/results/**
+basecall/results/**
 
-# but keep selected result folders
-!**/results/
-!**/results/histograms/
-!**/results/histograms/**
-!**/results/comparison_graphs/
-!**/results/comparison_graphs/**
-!**/results/plots/
-!**/results/plots/**
+# but allow directories under alignment/results
+!alignment/results/**/
+
+# and allow only per_chrom_all.txt files there
+!alignment/results/**/per_chrom_all.txt
