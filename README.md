@@ -106,6 +106,12 @@ basecall/README.md
 
 ---
 
+### Example result figures
+
+Selected generated plots are available in the results folders. For example:
+
+- [TeloBP telomere length comparison between Dorado SUP model versions](basecall/results/comparison_graphs/compare_versions_sup_telobp_violin.pdf)
+
 ## Dataset availability
 
 Large input datasets are not stored directly in this Git repository.
