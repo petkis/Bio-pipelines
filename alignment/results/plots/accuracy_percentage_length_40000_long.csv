@@ -71,6 +71,15 @@
 "winnowmap","chr12","Telo","Masked",40000,100
 "winnowmap","chr12","Telo","NoTelo",40000,100
 "winnowmap","chr12","Telo","Telo",40000,100
+"minimap2","chr13","Masked","Masked",40000,57.48
+"minimap2","chr13","Masked","NoTelo",40000,56.84
+"minimap2","chr13","Masked","Telo",40000,57.06
+"minimap2","chr13","NoTelo","Masked",40000,55.4
+"minimap2","chr13","NoTelo","NoTelo",40000,55.33
+"minimap2","chr13","NoTelo","Telo",40000,56.4
+"minimap2","chr13","Telo","Masked",40000,53.93
+"minimap2","chr13","Telo","NoTelo",40000,54.42
+"minimap2","chr13","Telo","Telo",40000,60.05
 "winnowmap","chr13","Masked","Masked",40000,56.35
 "winnowmap","chr13","Masked","NoTelo",40000,56.88
 "winnowmap","chr13","Masked","Telo",40000,56.28
