@@ -26,7 +26,6 @@
 
 # ignore everything inside alignment/results by default
 alignment/results/**
-basecall/results/**
 
 # but allow directories under alignment/results
 !alignment/results/**/
