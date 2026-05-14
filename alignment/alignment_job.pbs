@@ -1,9 +1,16 @@
 #!/bin/bash
+
+# Run an alignment pipeline for one chromosome arm using minimap2 or winnowmap.
+# The script extracts a 250 kb terminal region, runs alignments for several read lengths,
+# processes the alignments, and copies the final results back from scratch.
+
 #PBS -N alignment_pipeline
 #PBS -l select=1:ncpus=18:mem=300gb:scratch_local=220gb
 #PBS -l walltime=24:00:00
 #PBS -o latest_align.out
 #PBS -e latest_align.err
+
+# Configuration
 
 set -euo pipefail
 
@@ -11,17 +18,23 @@ WORKDIR="$PBS_O_WORKDIR"
 DESTDIR="$PBS_O_WORKDIR/results"
 LOGSDIR="$PBS_O_WORKDIR/job_logs"
 
-mkdir -p "$LOGSDIR"
-
-CHROMARM="${ARM:-p}"
-
 module purge
 module add samtools
 
+CHROMARM="${ARM:-p}"
 TOOL="${TOOL:-minimap2}"
 CHROM="${CHROM:-chr13_PATERNAL}"
 LENGTHS=(10000 20000 30000 40000)
 
+mkdir -p "$LOGSDIR"
+
+exec >"$LOGSDIR/${CHROM}_${PBS_JOBID}.out"
+exec 2>"$LOGSDIR/${CHROM}_${PBS_JOBID}.err"
+
+# Add wgsim to PATH; edit this for your usage.
+export PATH="/storage/brno2/home/xpetkov/sw_wgsim/bin:$PATH"
+
+# Convert tool name to lowercase and check that it is valid.
 TOOL="${TOOL,,}"
 
 case "$TOOL" in
@@ -31,9 +44,6 @@ case "$TOOL" in
         exit 1
         ;;
 esac
-
-exec >"$LOGSDIR/${CHROM}_${PBS_JOBID}.out"
-exec 2>"$LOGSDIR/${CHROM}_${PBS_JOBID}.err"
 
 cd "$PBS_O_WORKDIR"
 
@@ -63,6 +73,7 @@ chmod +x alignment_*.sh
 
 mkdir -p chroms
 
+# Index the telomere-containing genome and get the selected chromosome length.
 samtools faidx genome_telomeres.fa
 CHR_LENGTH=$(awk -v c="$CHROM" '$1==c{print $2}' genome_telomeres.fa.fai)
 
@@ -76,6 +87,8 @@ if (( CHR_LENGTH < 250000 )); then
   exit 1
 fi
 
+# Define the chromosome region to extract.
+# p-arm uses the first 250 kb, q-arm uses the last 250 kb.
 if [ "$CHROMARM" = "p" ]; then
     START=1
     END=250000
@@ -83,12 +96,14 @@ elif [ "$CHROMARM" = "q" ]; then
     START=$((CHR_LENGTH - 250000 + 1))
     END=$CHR_LENGTH
 else
-    echo "CHROMARM must be p or q"
+    echo "CHROMARM must be p or q" >&2
     exit 1
 fi
+
 REGION="${CHROM}:${START}-${END}"
 echo "$REGION"
 
+# Index all genome versions and extract the selected region from each one.
 samtools faidx genome_masked.fa
 samtools faidx genome_no_telomeres.fa
 samtools faidx genome_telomeres.fa
@@ -99,9 +114,8 @@ samtools faidx genome_telomeres.fa    "$REGION" > "chroms/${CHROM}_Telo.fa"
 
 echo "CHR_LENGTH = $CHR_LENGTH"
 
-export PATH="/storage/brno2/home/xpetkov/sw_wgsim/bin:$PATH"
-
-echo "=== START MINIMAP2 SIMULATIONS ==="
+# run read simulations and alignment for simulated reads
+echo "=== START ALIGNMENT SIMULATIONS ==="
 
 module purge
 module add mambaforge
@@ -119,11 +133,12 @@ for LEN in "${LENGTHS[@]}"; do
     ./alignment_tools.sh "$CHROM" "$LEN" Masked "$TOOL"
 done
 
-echo "=== FINISHED MINIMAP2 ==="
+echo "=== FINISHED ALIGNMENT USING ${TOOL} ==="
 
 module add samtools
 module add metabase/1
 
+# Process alignment results
 echo "=== START PROCESSING ==="
 
 ./alignment_processing.sh "$CHROM" "$CHR_LENGTH" Telo
@@ -132,11 +147,12 @@ echo "=== START PROCESSING ==="
 
 echo "=== FINISHED PROCESSING ==="
 
+# copy output from scratch_dir
 echo "Copying full processing results → $DESTDIR/PROC_RESULTS_${CHROM}"
 
 mkdir -p "$DESTDIR/${TOOL}_${CHROMARM}_PROC_RESULTS_${CHROM}/"
 rsync -av --exclude='*.sam' "$SCRATCHDIR/"*"_post_alignments"/ \
-      "$DESTDIR/${TOOL}_${CHROMARM}_PROC_RESULTS_${CHROM}/" || true
+      "$DESTDIR/${TOOL}_${CHROMARM}_PROC_RESULTS_${CHROM}/"
 
 echo "=== ALL OUTPUT COPIED ==="
 

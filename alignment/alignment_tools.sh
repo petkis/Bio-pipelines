@@ -1,8 +1,12 @@
 #!/bin/bash
+
+# Simulate reads from extracted chromosome-arm FASTA files and align them
+# to one selected reference genome subtype using minimap2 or winnowmap.
+
 set -euo pipefail
 
 # ======================
-# INPUTS
+# INPUTS (arguments passed from the main pipeline script)
 # ======================
 CHROM="$1"          # e.g. chr1_MATERNAL
 READLEN="$2"        # e.g. 45000
@@ -21,7 +25,7 @@ echo "CHROM     = $CHROM"
 echo "READLEN   = $READLEN"
 echo "SUBTYPE   = $SUBTYPE"
 
-# reference selection
+# Select the reference genome according to the requested subtype.
 case "$SUBTYPE" in
   Masked) REF_FA="genome_masked.fa" ;;
   NoTelo) REF_FA="genome_no_telomeres.fa" ;;
@@ -29,19 +33,20 @@ case "$SUBTYPE" in
   *) echo "ERROR: invalid SUBTYPE: $SUBTYPE"; exit 1 ;;
 esac
 
-# repetitive k-mer list selection (for Winnowmap)
+# Select the repetitive k-mer list required by Winnowmap.
 case "$SUBTYPE" in
   Masked) REP_K15="repetitive_k15_masked.txt" ;;
   NoTelo) REP_K15="repetitive_k15_notelo.txt" ;;
   Telo)   REP_K15="repetitive_k15_telo.txt" ;;
 esac
 
+# Define alignment settings and input/output locations.
 REF_IDX="${REF_FA}.mmi"
 THREADS=18
 MINIMAP_PRESET="map-ont"
 
 CHROMFA_DIR="chroms"
-WGSIM_BIN="/storage/brno2/home/xpetkov/sw_wgsim/bin/wgsim"
+WGSIM_BIN="wgsim"
 
 # wgsim parameters
 WGS_N=10000
@@ -53,20 +58,20 @@ WGS_INDEL_FRAC=0
 WGS_INDEL_EXT=0
 WGS_SEED=42
 
-# ---------------------
-# CHECKS
-# ---------------------
-if [[ ! -x "$WGSIM_BIN" ]]; then
-  echo "ERROR: wgsim not executable: $WGSIM_BIN" >&2
+# Check that wgsim exists and is executable.
+if [[ ! -x "$(command -v "$WGSIM_BIN")" ]]; then
+  echo "ERROR: wgsim not found or not executable in PATH" >&2
   exit 1
 fi
 
+# Check that the selected reference FASTA exists.
 if [[ ! -f "$REF_FA" ]]; then
   echo "ERROR: reference $REF_FA missing" >&2
   exit 1
 fi
 
-# INDEX REFERENCE
+# Build an index for the selected reference.
+# Winnowmap uses a repetitive k-mer file during indexing.
 echo "Indexing reference..."
 if [[ "$TOOL" == "winnowmap" ]]; then
   "$TOOL" -W "$REP_K15" -d "$REF_IDX" "$REF_FA"
@@ -75,15 +80,23 @@ else
 fi
 
 mkdir -p "${CHROM}_${SUBTYPE}_align"
+
+# Make unmatched *.fa patterns expand to nothing instead of staying literal.
 shopt -s nullglob
 
-#Loop
+# Process each extracted chromosome-arm FASTA file from the chroms directory.
 for path in "${CHROMFA_DIR}"/*.fa; do
+    # Get the filename without path and extension.
     base=$(basename "$path" .fa)
-    chrom=${base%_*}      # left part before last '_'
-    subtype=${base##*_}   # right part after last '_'
+
+    # Split the filename into chromosome name and subtype.
+    # Example: chr13_PATERNAL_Telo -> chrom=chr13_PATERNAL, subtype=Telo.
+    chrom=${base%_*}
+    subtype=${base##*_}
 
     infile="${CHROMFA_DIR}/${base}.fa"
+
+    # Skip this entry if the expected FASTA file is missing.
     if [[ ! -f "$infile" ]]; then
         echo "WARNING: missing $infile => skipping"
         continue
@@ -96,6 +109,8 @@ for path in "${CHROMFA_DIR}"/*.fa; do
     fq="${outdir}/${chrom}_${subtype}_R1.fq"
     sam="${outdir}/aligned_${subtype}.sam"
 
+    # Simulate reads from the extracted chromosome-arm FASTA file.
+    # Only the first read file is kept; the second read file is discarded to /dev/null.
     echo "Simulating $chrom ($subtype) -> $outdir"
     "$WGSIM_BIN" \
       -N "$WGS_N" -1 "$WGS_LEN1" -2 "$WGS_LEN2" \
@@ -104,12 +119,13 @@ for path in "${CHROMFA_DIR}"/*.fa; do
       -s "$WGS_SEED" \
       "$infile" "$fq" /dev/null
 
+    # Align the simulated reads to the selected reference genome.
     echo "Aligning to $sam"
     if [[ "$TOOL" == "winnowmap" ]]; then
         "$TOOL" -t "$THREADS" -a -x "$MINIMAP_PRESET" \
             -W "$REP_K15" \
             --split-prefix "${chrom}_${subtype}_split" \
-            "$REF_FA" "$fq" > "$sam"
+            "$REF_IDX" "$fq" > "$sam"
     else
         "$TOOL" -t "$THREADS" -a -x "$MINIMAP_PRESET" \
             --split-prefix "${chrom}_${subtype}_split" \
