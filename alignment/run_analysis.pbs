@@ -14,8 +14,6 @@ mkdir -p "$LOGSDIR"
 exec >"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.out"
 exec 2>"$LOGSDIR/${PBS_JOBNAME}_${PBS_JOBID}.err"
 
-MODE="${MODE:-same}"
-
 INPUT_DATA_DIR="$PBS_O_WORKDIR/results"
 OUTPUT_DIR="$PBS_O_WORKDIR/results/plots"
 SCRIPT_DIR="$PBS_O_WORKDIR"
@@ -41,7 +39,6 @@ module add python36-modules-gcc
 
 # 4. Run Python Aggregator
 echo "Starting Python data aggregation..."
-export MODE=$MODE
 
 python3 collect_results.py
 

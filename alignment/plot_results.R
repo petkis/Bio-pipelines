@@ -1,9 +1,12 @@
 library(tidyverse)
 library(grid)
 
-# ----------------------------
-# INPUT CHECK
-# ----------------------------
+# Create one multi-page PDF for minimap2 and one multi-page PDF for winnowmap.
+# Each page shows one chromosome, with read length on the x-axis
+# and mapping accuracy percentage on the y-axis.
+# The plots compare different reference setups and read simulation setups.
+
+# Check if input exits, load it and check if expected columns are present.
 if (!file.exists("combined_results.csv")) {
   stop("ERROR: combined_results.csv not found!")
 }
@@ -21,9 +24,8 @@ if (length(missing_cols) > 0) {
 
 cat("CSV OK | Rows:", nrow(dat), "\n")
 
-# ----------------------------
-# PREP
-# ----------------------------
+# Prepare data for plotting:
+# convert read length to kb, set factor order.
 mydat <- dat %>%
   mutate(
     Length_kb = Length / 1000,
@@ -31,12 +33,9 @@ mydat <- dat %>%
     chromType = factor(chromType, levels = c("Masked", "NoTelo", "Telo")),
     chrom = factor(chrom),
     tool = factor(tool)
-  ) %>%
-  filter(!chrom %in% c("chrM", "chrMT"))
+  )
 
-# ----------------------------
-# LABELS
-# ----------------------------
+# Label, colour and shape setup for references and read simulations
 ref_labels <- c(
   Masked = "Masked reference",
   NoTelo = "Reference without telomeres",
@@ -67,9 +66,7 @@ chromtype_labels <- c(
   Telo   = "Telo: complete reference incl. subtelomeres and telomeres"
 )
 
-# ----------------------------
-# THEME
-# ----------------------------
+# Main theme used in the final plots.
 base_theme <- theme_bw(base_size = 12) +
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
@@ -79,21 +76,8 @@ base_theme <- theme_bw(base_size = 12) +
     legend.position = "right"
   )
 
-readable_theme <- theme_bw(base_size = 15) +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
-    axis.title = element_text(face = "bold", size = 15),
-    axis.text = element_text(size = 12),
-    strip.background = element_rect(fill = "grey85"),
-    strip.text = element_text(face = "bold", size = 13),
-    legend.position = "right",
-    legend.title = element_text(face = "bold", size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-# ----------------------------
-# CHROM ORDER
-# ----------------------------
+# Convert chromosome names into numeric order:
+# chr1-22 first, then chrX, then chrY, unknown names last.
 chr_order_key <- function(ch) {
   ch <- as.character(ch)
   ch <- sub("^chr", "", ch)
@@ -105,6 +89,7 @@ chr_order_key <- function(ch) {
   return(999L)
 }
 
+# Create a cleaner chromosome name for plot titles.
 pretty_chr_name <- function(ch) {
   ch <- as.character(ch)
   ch <- sub("^chr", "", ch)
@@ -112,9 +97,9 @@ pretty_chr_name <- function(ch) {
   paste0("chromosome", ch)
 }
 
-# ----------------------------
-# FUNCTION: FULL PDF PER TOOL
-# ----------------------------
+# Function for creating one PDF per tool
+# It only takes data from specified tool
+# Creates one page per chromosome.
 make_tool_pdf <- function(tool_name) {
 
   cat("Processing tool:", tool_name, "\n")
@@ -209,8 +194,6 @@ make_tool_pdf <- function(tool_name) {
   cat("Saved:", out_pdf, "\n")
 }
 
-# ----------------------------
-# CREATE TWO PDFS
-# ----------------------------
+# Create pdf for each tool
 make_tool_pdf("minimap2")
 make_tool_pdf("winnowmap")
