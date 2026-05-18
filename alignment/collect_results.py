@@ -65,12 +65,68 @@ for proc_dir in ROOT.glob("*_PROC_RESULTS_*"):
                     row[p[0]] = int(p[1])
 
         target_key = f"{chrom}_{side}"
+        opposite_side = "PATERNAL" if side == "MATERNAL" else "MATERNAL"
 
-        correct_reads = row.get(target_key, 0)
-        row["Percent"] = (correct_reads / row["N"]) * 100.0 if row["N"] > 0 else 0
+        correct_chrom_correct_hap = 0
+        correct_chrom_wrong_hap = 0
+        wrong_chrom_correct_hap = 0
+        wrong_chrom_wrong_hap = 0
+
+        # Count columns like chr1_MATERNAL, chr1_PATERNAL, chrX_MATERNAL, etc.
+        mapping_cols = [
+            c for c in row.keys()
+            if c.startswith("chr") and c not in {"chrom", "chromType"}
+        ]
+
+        for c in mapping_cols:
+            count = row.get(c, 0)
+
+            if c.endswith(f"_{side}"):
+                same_hap = True
+            else:
+                same_hap = False
+
+            if c.startswith(f"{chrom}_"):
+                same_chrom = True
+            else:
+                same_chrom = False
+
+            if same_chrom and same_hap:
+                correct_chrom_correct_hap += count
+            elif same_chrom and not same_hap:
+                correct_chrom_wrong_hap += count
+            elif not same_chrom and same_hap:
+                wrong_chrom_correct_hap += count
+            else:
+                wrong_chrom_wrong_hap += count
+
+        row["CorrectChromCorrectHap"] = correct_chrom_correct_hap
+        row["CorrectChromWrongHap"] = correct_chrom_wrong_hap
+        row["WrongChromCorrectHap"] = wrong_chrom_correct_hap
+        row["WrongChromWrongHap"] = wrong_chrom_wrong_hap
+
+        row["Percent_CorrectChromCorrectHap"] = (
+            correct_chrom_correct_hap / row["N"]
+        ) * 100.0 if row["N"] > 0 else 0
+
+        row["Percent_CorrectChromWrongHap"] = (
+            correct_chrom_wrong_hap / row["N"]
+        ) * 100.0 if row["N"] > 0 else 0
+
+        row["Percent_WrongChromCorrectHap"] = (
+            wrong_chrom_correct_hap / row["N"]
+        ) * 100.0 if row["N"] > 0 else 0
+
+        row["Percent_WrongChromWrongHap"] = (
+            wrong_chrom_wrong_hap / row["N"]
+        ) * 100.0 if row["N"] > 0 else 0
+
+        row["Percent"] = row["Percent_CorrectChromCorrectHap"]
 
         rows.append(row)
 
 if rows:
     df = pd.DataFrame(rows)
     df.fillna(0).to_csv(OUTFILE, index=False)
+else:
+    print("XD")
